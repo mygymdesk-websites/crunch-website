@@ -287,6 +287,15 @@ export function LocationEditor({
           disabled={!canEdit}
         />
         <Input
+          id={`${location.id}-gstin`}
+          name="gstin"
+          label="GSTIN (this branch)"
+          showLabel
+          defaultValue={location.gstin ?? ""}
+          hint="GST registration is state-wise, so each branch has its own. Leave blank and the footer omits the line entirely — it never shows a placeholder."
+          disabled={!canEdit}
+        />
+        <Input
           id={`${location.id}-order`}
           name="display_order"
           label="Display order"

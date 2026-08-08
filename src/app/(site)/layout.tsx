@@ -15,7 +15,7 @@ import {
   THEME_STORAGE_KEY,
   siteUrl,
 } from "@/lib/site";
-import { getLocations } from "@/lib/site-settings";
+import { getLocations, resolveLocation } from "@/lib/site-settings";
 
 import "../globals.css";
 
@@ -108,6 +108,9 @@ export default async function RootLayout({
   // Rendered into the HTML, so the first paint is already the right theme.
   const theme = themeFromCookie(cookieStore.get(THEME_STORAGE_KEY)?.value);
 
+  // The footer's GSTIN is state-wise, so it follows the selected branch.
+  const currentLocation = await resolveLocation(initialSlug);
+
   return (
     <html
       lang="en-IN"
@@ -129,7 +132,7 @@ export default async function RootLayout({
         >
           <Header />
           <main id="main">{children}</main>
-          <Footer locations={locations} />
+          <Footer locations={locations} currentLocation={currentLocation} />
           <TrialModal />
           <CartDrawer />
         </AppProviders>

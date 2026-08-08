@@ -88,6 +88,10 @@ export async function updateLocation(
       whatsapp: text(form, "social_whatsapp"),
     },
     mgd_location_id: text(form, "mgd_location_id"),
+    // Uppercased because the CHECK constraint expects the canonical form, and
+    // people type GSTINs in lower case. Blank stays NULL so the footer omits
+    // the line rather than rendering an empty "GSTIN".
+    gstin: text(form, "gstin")?.toUpperCase() ?? null,
     display_order: Number(form.get("display_order") ?? 0) || 0,
     is_active: form.get("is_active") === "on",
   };

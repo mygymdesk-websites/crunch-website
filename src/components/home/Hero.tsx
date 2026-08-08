@@ -91,6 +91,9 @@ export function Hero() {
             </button>
           </div>
 
+          {/* Opening hours are real (site_settings); the member/coach counts
+              were placeholder and are gone until the client confirms them. The
+              row hides entirely if nothing is left to show. */}
           <div className="mt-[42px] flex animate-[fadeUp_.7s_.45s_both] flex-wrap gap-8 border-t border-line pt-6">
             {HERO_STATS.map((stat) => (
               <div key={stat.label}>

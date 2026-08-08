@@ -50,7 +50,8 @@
       "is_active": true,
       "is_default": true,
       "display_order": 1,
-      "hero_image_url": null
+      "hero_image_url": null,
+      "gstin": null
     },
     {
       "slug": "gurgaon",
@@ -90,7 +91,8 @@
       "is_active": true,
       "is_default": false,
       "display_order": 2,
-      "hero_image_url": null
+      "hero_image_url": null,
+      "gstin": null
     }
   ]
 }

@@ -1,5 +1,107 @@
 # Handoff
 
+## 0.0 Phase 3 report (08/08/26) — gate FAILED, Part 3 delivered
+
+### 🔴 Part 1 (booking) — both gate conditions fail
+
+**(a) No bookable inventory.** The sessions endpoint returns `{"sessions":[]}`
+at both branches. At the database: **0 class types, 0 class sessions, 0
+services.** There is nothing to book.
+
+**(b) No payment gateway.** `tenant_payment_settings` has **zero rows** for the
+tenant, so `website-booking-order` would return `503 gateway_not_configured`.
+I could not call it to confirm — that needs a `session_id`, which (a) means
+does not exist — but the absence of any gateway row is conclusive.
+
+To resume Part 1 I need both:
+
+1. **At least one scheduled future class session** — a class type, then a
+   session on the timetable at a branch, priced (a ₹0 session is refused with
+   `422 session_not_priced` and can never be booked online).
+2. **MGD test-mode Razorpay credentials attached to the tenant**, per the
+   Track A pattern. `test_mode: true` in the order response is expected and
+   already flows to the planned TEST MODE ribbon.
+
+Nothing of Part 1 was built — no booking modal, no Checkout mount, no error
+states. Building it blind against an unverifiable contract is exactly what the
+gate exists to prevent.
+
+### 🔴 Part 2 (navigation performance) — blocked on there being no deployment
+
+The brief requires diagnosis "on the deployed Vercel build (not localhost)".
+**There is no deployed build.** No Vercel project is linked (`.vercel/` absent),
+and `crunchfitness.in` currently serves the **legacy PHP site** via Cloudflare —
+the Phase 6 cutover has not happened.
+
+Standing up a deployment is outward-facing and needs secrets (MGD key, Supabase
+service role) pushed into a new Vercel project, so I have not done it
+unprompted. **Say the word and I will**, or link the project yourself and I will
+measure against it.
+
+I deliberately did NOT implement the perf fix off localhost numbers: the whole
+instruction was diagnose-then-fix, and shipping an unmeasured fix to a
+performance complaint is how you end up with a change nobody can prove helped.
+The suspected cause named in the brief (cookie reads forcing whole-route dynamic
+rendering) matches what I saw in Phase 2 — every route is `ƒ` — so the diagnosis
+is likely right; it just is not yet *measured*.
+
+### ✅ GO-LIVE BLOCKER CLEARED (unprompted good news)
+
+`NEXT_PUBLIC_SUPABASE_URL` is now **`db.crunchfitness.in`** — the Cloudflare
+proxy has landed. `npm run check:env` passes on its own merit.
+
+`ALLOW_RAW_SUPABASE_URL=true` is still in `.env.local` and is now **inert** (the
+check no longer fires). Left in place per instruction, but it should be deleted
+so a future regression to a raw URL cannot pass unnoticed in dev. `.env.local`
+is not committed, so this is a one-line local edit.
+
+---
+
+## 0.0.1 CLIENT-CONTENT-REQUIRED
+
+Everything below was placeholder copy from the design mock that read as a
+statement of fact about a real business. All of it is now **removed**, and each
+section **hides itself** rather than showing a guess. Nothing was replaced with
+an invention.
+
+Give this list to the client. Each item is drop-in: fill the data and the
+section returns with no code change.
+
+| # | Claim that was on the site | Where it lives now | Risk if left fabricated |
+|---|---|---|---|
+| 1 | **Three member testimonials** — invented names ("Rahul Mehra", "Simran Kaur", "Aditya Nair"), invented join dates, stock-photo faces | `TESTIMONIALS` in `src/lib/fixtures/site-content.ts` | **Highest.** Fabricated endorsements attributed to named people. Needs the member's actual words *and* permission to publish |
+| 2 | **"1,800+ active members"**, **"14 certified coaches"** | `HERO_STATS` | Unverifiable business claims in the hero |
+| 3 | **"8 years running"**, **"42 classes a week"** | `ABOUT_STATS` | Same, on About |
+| 4 | **"95% member satisfaction"**, **"90% annual renewals"**, **"98% of classes start on time"** | `TRUST_BARS` | Three statistics with no measurement behind them |
+| 5 | **Four coaches' roles, specialisms and branch assignments** — the names are real, the job titles were written for the mock | `TRAINERS` | Publishing a real person under an invented job title |
+| 6 | **Facility specifics** — "four power racks, two platforms, calibrated plates to 25 kg", towel service, etc. | `FACILITIES` | Equipment nobody counted |
+| 7 | **"Forty-two classes a week"**, **"capped at twenty people"** | Classes page copy — removed; capacity now comes from each session's own `spotsTotal` | Contradicts live data the moment a session differs |
+| 8 | **"Started in 2018… twelve members and a second-hand rack… 1,800 members and fourteen coaches"** | About intro — specifics removed, voice kept | Invented company history |
+| 9 | **GSTIN `07AABCU9603R1ZX`** | Now `site_settings.gstin`, **per branch**, blank | **A fabricated tax registration number.** See below |
+| 10 | **Instagram strip + About gallery** — stock photography presented as the gym's own | `SOCIAL_TILES`, `ABOUT_GALLERY` | Passing off stock images as the client's premises |
+| 11 | **All gym photography** — hero, location cards, class cards | `HERO_IMAGE`, `LOCATION_IMAGES`, `CLASS_IMAGES` | Unsplash stand-ins; striped placeholder renders instead |
+| 12 | **Addresses, phones, emails, opening hours** | `site_settings` (admin-editable) | Came from the design mock. **Please confirm all of it is correct** — these are on the site as fact today |
+| 13 | **Shop fulfilment promises** — "₹79 flat", "3–5 working days", "collect within 24 hours", "sourced from authorised distributors" | `SHIPPING_FLAT_RATE` in `src/lib/shop.ts`, shop info cards | Founder-set policy; confirm before launch |
+| 14 | **Policy documents** (Refund, Guidelines, Terms, Privacy) | `src/content/policies.ts` | Still placeholder, still not legally reviewed (Phase 1 gap, unchanged) |
+
+**GSTIN specifically**, as asked: it is now a per-location column
+(`site_settings.gstin`), editable in `/admin`, **NULL for both branches**, and
+the footer omits the whole "GST-registered · GSTIN …" line when it is blank —
+it never renders a placeholder. A `CHECK` constraint validates the 15-character
+format when a value *is* set, so a typo is refused rather than published.
+Modelled per-location because **GST registration in India is state-wise** —
+Delhi and Haryana need separate numbers, and a single company-level field would
+have been wrong the moment the second branch opened.
+
+**Two things deliberately kept:**
+- The `WHY_US` block ("form checks are free, not upsold") — positioning rather
+  than measurable claims. Still worth the client confirming it is true of how
+  they operate.
+- The hero's floating "142 bpm" / "76% session goal" chips — a visibly
+  stylised UI motif inside an illustration, not a claim about the gym.
+
+---
+
 > ## Phase 2 — Live Display + Leads · MERGED to `main`
 > Schema applied to the live client project, RLS + GRANTs verified at the
 > database, and the enquiry mirror proven end-to-end (site → MyGymDesk →

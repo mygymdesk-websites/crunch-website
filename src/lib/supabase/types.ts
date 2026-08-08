@@ -85,6 +85,12 @@ export interface SiteLocation {
    * readers then fall back to an UNFILTERED API call rather than guessing.
    */
   mgd_location_id: string | null;
+  /**
+   * State-wise GST registration for this branch. Null until the client
+   * supplies a real one — the footer renders nothing rather than a
+   * placeholder tax number.
+   */
+  gstin: string | null;
   is_default: boolean;
   display_order: number;
   hero_image_url: string | null;

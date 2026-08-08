@@ -12,10 +12,22 @@ import type { LocationSocials, SiteLocation } from "@/lib/supabase/types";
  * the day Faridkot is inserted, with no edit here. The grid is
  * `auto-fit/minmax(240px)` so the extra column simply flows.
  */
-export function Footer({ locations }: { locations: SiteLocation[] }) {
+export function Footer({
+  locations,
+  currentLocation,
+}: {
+  locations: SiteLocation[];
+  /** The visitor's selected gym — its GSTIN is the one that applies to them. */
+  currentLocation?: SiteLocation;
+}) {
   // Brand channels come from the default location: they are the company's
   // handles, not a per-gym thing, and this keeps the footer server-rendered.
   const brand = locations.find((l) => l.is_default) ?? locations[0];
+
+  // GST registration is state-wise, so the number shown is the selected
+  // branch's. Blank until the client supplies a real one — the line simply
+  // isn't rendered rather than showing a placeholder tax number.
+  const gstin = (currentLocation ?? brand)?.gstin?.trim();
 
   return (
     <footer className="mt-[76px] border-t border-line bg-surface2">
@@ -87,8 +99,8 @@ export function Footer({ locations }: { locations: SiteLocation[] }) {
 
       <div className="mx-auto flex w-full max-w-content flex-wrap justify-between gap-3 border-t border-line px-5 pb-10 pt-[18px] text-[12px] text-muted">
         <span>
-          © {new Date().getFullYear()} Crunch Fitness. GST-registered · GSTIN{" "}
-          {LEGAL.gstin}
+          © {new Date().getFullYear()} Crunch Fitness.
+          {gstin ? ` GST-registered · GSTIN ${gstin}` : ""}
         </span>
         <span>{LEGAL.paymentsLine}</span>
       </div>

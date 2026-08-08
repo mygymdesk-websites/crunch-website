@@ -69,6 +69,10 @@ export function HomeClasses({ classes }: { classes: MgdClassType[] }) {
 
 /** Coach portraits. The first card carries the accent ring, per the design. */
 export function HomeTrainers() {
+  // Hidden until the client confirms each coach's role and branch. Publishing
+  // a real person under an invented job title is not a small error.
+  if (TRAINERS.length === 0) return null;
+
   return (
     <Section band="surface" className="mt-[76px]">
       <Container className="reveal py-16">
@@ -249,6 +253,11 @@ export function HomePackages({
 }
 
 export function HomeTestimonials() {
+  // Hidden until real, permissioned member quotes exist. Fabricated
+  // endorsements attributed to named people are the highest-risk claim on a
+  // live business site.
+  if (TESTIMONIALS.length === 0) return null;
+
   return (
     <Container className="reveal pt-[72px]">
       <Heading className="mb-[30px]">Members, in their words</Heading>
@@ -292,6 +301,9 @@ export function HomeTestimonials() {
 }
 
 export function HomeSocial() {
+  // Was stock photography presented as the gym's own Instagram feed.
+  if (SOCIAL_TILES.length === 0) return null;
+
   return (
     <Container className="reveal pt-[72px]">
       <div className="mb-[18px] flex flex-wrap items-center justify-between gap-5">
@@ -399,6 +411,8 @@ export function HomeNumbersAndAppointment() {
           </p>
 
           <div className="grid gap-[26px]">
+            {/* Percentages nobody measured are gone; the block hides when
+                there is nothing real to show. */}
             {TRUST_BARS.map((bar, index) => (
               <div key={bar.label}>
                 <div className="mb-[9px] flex items-baseline justify-between gap-3">
