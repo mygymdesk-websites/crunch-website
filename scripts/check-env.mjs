@@ -107,6 +107,31 @@ const PUBLIC_ALLOWLIST = new Set([
 for (const [key, value] of Object.entries(env)) {
   if (!key.startsWith("NEXT_PUBLIC_")) continue;
 
+  const raw = String(value ?? "");
+
+  // A multi-line public value means a BLOCK of .env was pasted into a single
+  // variable. This actually happened in production: the anon key held the JWT,
+  // a newline, and SUPABASE_DB_PASSWORD=… — which broke every Supabase read
+  // (invalid HTTP header value) and put the database password one import away
+  // from the browser bundle. Cheap to check, expensive to miss.
+  if (/[\r\n]/.test(raw)) {
+    errors.push(
+      `${key} contains a line break, so more than one value was pasted into it.\n` +
+        `    Every NEXT_PUBLIC_* value is inlined into the browser bundle, and an\n` +
+        `    invalid header value makes every request using it fail.\n` +
+        `    Set this variable to exactly one value, on one line.`,
+    );
+    continue;
+  }
+
+  if (/\b[A-Z][A-Z0-9_]*\s*=/.test(raw)) {
+    errors.push(
+      `${key} looks like it holds a KEY=VALUE assignment rather than a bare value.\n` +
+        `    Store only the value itself — the variable name is the name.`,
+    );
+    continue;
+  }
+
   if (/MGD|SERVICE_ROLE|SHIPROCKET|RAZORPAY_(KEY_)?SECRET|WEBHOOK_SECRET/i.test(key)) {
     errors.push(
       `${key} is a NEXT_PUBLIC_* variable holding a server-only secret.\n` +
@@ -117,7 +142,7 @@ for (const [key, value] of Object.entries(env)) {
   }
 
   // Catch a secret pasted into an otherwise innocent public var.
-  const v = String(value ?? "");
+  const v = raw;
   if (/^mgd_live_/.test(v)) {
     errors.push(
       `${key} contains what looks like a MyGymDesk API key (mgd_live_…).\n` +
@@ -138,7 +163,19 @@ for (const [key, value] of Object.entries(env)) {
 }
 
 // ---------------------------------------------------------------------------
-// 3. Report
+// 3. The anon key must be a single JWT
+// ---------------------------------------------------------------------------
+const anonKey = (env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").trim();
+if (anonKey && !/^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(anonKey)) {
+  errors.push(
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY is not a single well-formed JWT.\n" +
+      "    Expected three dot-separated base64url segments and nothing else.\n" +
+      "    Anything extra ends up in an HTTP header, where it fails every request.",
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 4. Report
 // ---------------------------------------------------------------------------
 for (const warning of warnings) {
   console.warn(`⚠ ${warning}`);

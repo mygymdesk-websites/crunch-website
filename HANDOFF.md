@@ -78,88 +78,104 @@ Three probes against the same production deployment localised it:
 So: not the network, not the cold start, not the bundle. The cost is data
 fetching inside the render, and it is paid on every route.
 
-### Root cause
+### Root cause — a corrupt environment variable
 
-Two things compounding:
+My first diagnosis (uncached read + wrong region) was **wrong**, and the fix
+based on it moved production from 7.37s to 7.2s: nothing. The real cause only
+showed up from inside the function.
 
-1. **The location read was uncached and on the critical path of every page.**
-   `getLocations()` feeds the header, the footer, the location switcher and
-   `generateMetadata`. `cache()` deduped it *within* one render, but nothing
-   cached it *across* requests — so every single page view hit the database
-   before it could render anything.
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` in Vercel production holds **two values**: the
+anon JWT, a line break, and then `SUPABASE_DB_PASSWORD=...`. A block of a `.env`
+file was pasted into a single variable.
 
-2. **The function executes in the wrong hemisphere.** `X-Vercel-Id:
-   bom1::iad1::…` — the request enters the Mumbai edge and is then executed in
-   `iad1` (US East), while both Supabase (`db.crunchfitness.in`) and MyGymDesk
-   (`db.mygymdesk.in`) are in Mumbai. Every one of those reads was a round trip
-   to India and back.
+Timings from inside the running function in `bom1`:
 
-The clincher for (1): `/contact` and `/policies/refund` make **zero** MyGymDesk
-calls, yet cost exactly what `/classes` costs. The MGD reads were already
-cached in Phase 2 (proven then: 10 page loads, 0 API requests). The only
-uncached read left was the shared Supabase one — which is why the number is
-identical everywhere.
-
-### The fix
-
-| change | addresses |
+| step | result |
 |---|---|
-| `getLocations()` now uses Next's data cache, `revalidate: 300`, tagged `site-settings` | (1) — the database is off the per-request path |
-| `updateTag(SITE_SETTINGS_TAG)` in the admin save action | keeps (1) correct: an admin sees their own edit on the very next render |
-| `vercel.json` → `"regions": ["bom1"]` | (2) — function runs next to both databases |
-| `src/app/(site)/loading.tsx` | perceived paint: a click responds immediately instead of sitting on the old page |
+| `site_settings_public` with the key **as configured** | throws in **2 ms** — `TypeError: Headers.append: invalid header value` |
+| `site_settings_public` with the key **sanitised to its first line** | **HTTP 200 in 283 ms**, 1 row |
+| Supabase host, no apikey at all | 401 in 290 ms |
+| MyGymDesk host | 401 in 265 ms |
+| **`getLocations()` — what every page awaits** | **7004 ms** |
 
-Note on the Next 16 API: `revalidateTag` now requires a cache-life profile as a
-second argument, and `updateTag` is the Server-Action variant with
-read-your-own-writes semantics. `updateTag` is the correct one here — an admin
-must not have to save twice to see their change.
+So the network was never the problem: the database answers in 283 ms from
+Vercel. A line break in an HTTP header value is illegal, every Supabase request
+fails, and `supabase-js` spends ~7 seconds getting there. `getLocations()` then
+falls back to seed data and the page renders — slowly, and from the wrong
+source.
 
-### Evidence
+This explains every observation, including the ones that defeated the first
+diagnosis: flat across all routes (every route awaits `getLocations()`);
+unaffected by caching (a *failed* fetch is never cached); unaffected by the
+region move (it is not a network cost); and invisible locally (my `.env.local`
+is correct, so the failure path never ran).
 
-**The caching lever, isolated.** Same production build, same machine, same
-remote database, with and without the data cache — so geography is held
-constant and only the per-request read varies:
+### Two consequences beyond speed
 
-| route | uncached | cached |
-|---|---|---|
-| `/` | 66 ms | **18 ms** |
-| `/about` | 66 ms | **14 ms** |
-| `/classes` | 108 ms | **18 ms** |
-| `/packages` | 64 ms | **19 ms** |
-| `/shop` | 67 ms | **14 ms** |
-| `/contact` | 66 ms | **16 ms** |
-| `/policies/refund` | 110 ms | **15 ms** |
+**1. Production has been serving seed data, not the client's database.** Every
+`getLocations()` call has been failing and falling back. Anything an admin saved
+in Site Settings never appeared on the live site — it was written to the
+database correctly and then ignored at render.
 
-That ~50 ms is one Supabase round trip *from India*. From Virginia the same
-round trip is the multi-second toll seen in production.
+**2. The database password sits in a `NEXT_PUBLIC_*` variable.** I checked the
+served bundles: the password is **not** in the homepage HTML or any of its 9 JS
+chunks today, and the anon JWT is not referenced in them either. But
+`NEXT_PUBLIC_*` exists to be inlined into client JavaScript — this is one import
+on a client component away from being published to every visitor.
 
-**The cache is real and correctly tagged.** With `NEXT_PRIVATE_DEBUG_CACHE=1`:
+### What the client needs to do
 
-```
-FileSystemCache: get 9d8cd6fc… [ 'site-settings' ] FETCH false   ← miss
-FileSystemCache: get 9d8cd6fc… [ 'site-settings' ] FETCH true    ← hit
-FileSystemCache: get 9d8cd6fc… [ 'site-settings' ] FETCH true    ← hit (different route)
-```
+1. **Fix the Vercel env var**: set `NEXT_PUBLIC_SUPABASE_ANON_KEY` to the anon
+   JWT **only**, one line, nothing after it. Redeploy.
+2. **Rotate the Postgres password.** It was stored in a variable designed to be
+   public and has been sitting in the build environment. Treat it as disclosed.
+3. Confirm no other Vercel variable was pasted the same way.
 
-One entry, shared across routes, carrying the exact tag `updateTag` clears.
+### Why the check did not catch it
 
-### What is NOT yet proven
+`check:env` was written in Phase 2 to fail the build on exactly this class of
+mistake — but `"build": "next build"` never invoked it, so it only ever ran
+locally via `npm run verify`. On Vercel it has never run once.
 
-The production "after" number. The branch preview sits behind Vercel Deployment
-Protection (302 to SSO), and `crunch-website` is not visible to my Vercel token
-— it is not in the team the token can see, and there is no `.vercel/` link in
-the repo. So I can measure production (public) but not the preview.
+Now fixed: `build` runs `check:env` first, and the check has been taught this
+failure. It rejects any `NEXT_PUBLIC_*` value containing a line break or a
+`KEY=VALUE` assignment, and requires the anon key to be a single well-formed
+JWT. Verified against the exact production shape — it fails with both messages,
+and the correct value still passes.
 
-Expected after the deploy: pages land near the **332 ms** floor that
-`/api/enquiries` already demonstrates on that same infrastructure, since that
-floor is function-boot-plus-routing with no data reads — and there are now
-effectively no data reads on the hot path.
+**Consequence to expect:** the next production build will **fail** until the env
+var is fixed. That is deliberate. Production keeps serving the last good
+deployment in the meantime.
 
-One item to eyeball on the first real admin save: the end-to-end
-save→invalidate path. I proved the cache entry carries the right tag, but could
-not drive the admin UI to completion (sign-in is emailed OTP, and minting a
-session token was blocked). Worst case if `updateTag` misbehaves is bounded and
-self-healing: an edit takes up to 5 minutes to appear. No data risk.
+### The other two changes still stand
+
+They were not the root cause, but they are correct and stay:
+
+- **The location read is data-cached** (tagged, invalidated by `updateTag` on
+  admin save). Once the key is fixed this keeps the 283 ms database round trip
+  off the per-request path. Isolated locally, cache on vs off, same build and
+  machine: 66 ms -> 15 ms per route.
+- **`vercel.json` pins functions to `bom1`.** Confirmed live — `X-Vercel-Id`
+  went from `bom1::iad1` to `bom1::bom1`. Both databases are in Mumbai; the
+  function should not run in Virginia.
+- **`loading.tsx`** gives navigation an immediate response.
+
+### Still owed
+
+The production before/after table. "After" is meaningless until the env var is
+fixed, since every page is currently paying a 7-second failure. Once it is
+fixed, expect pages near the **~300 ms** floor already demonstrated on this
+deployment (`/api/...` route handler: 290 ms; database round trip: 283 ms).
+
+Non-regressions verified locally on the production build: dark theme present in
+the raw server HTML before any JS (no flash), location cookie resolves
+server-side, 0 px horizontal overflow at 360 and 1440 on all seven routes, and
+`check:env` / `check:locations` / `check:mgd-key` all pass.
+
+One item still to eyeball: the end-to-end admin save -> cache invalidation. The
+cache entry provably carries the `site-settings` tag that `updateTag` clears,
+but I could not drive the admin UI to completion (sign-in is emailed OTP).
+Worst case is bounded and self-healing: an edit takes up to 5 minutes to appear.
 
 ---
 
