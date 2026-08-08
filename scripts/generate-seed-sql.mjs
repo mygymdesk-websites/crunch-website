@@ -53,6 +53,7 @@ const COLUMNS = [
   "longitude",
   "socials",
   "mgd_location_id",
+  "gstin",
   "is_active",
   "is_default",
   "display_order",

@@ -19,7 +19,7 @@ import type { SiteLocation } from "@/lib/supabase/types";
 export const metadata: Metadata = {
   title: "Classes & Timetable",
   description:
-    "Forty-two coached classes a week across both Crunch Fitness gyms — strength, HIIT, spin, Zumba, yoga and conditioning. Capped at twenty people and starting on the minute.",
+    "Coached group classes across both Crunch Fitness gyms — strength, HIIT, spin, Zumba, yoga and conditioning. Every class starts on the minute.",
   alternates: { canonical: "/classes" },
 };
 
@@ -35,12 +35,14 @@ export default async function ClassesPage() {
     <>
       <PageHero
         eyebrow="Group classes"
-        title="Forty-two classes a week. Pick your hour."
+        title="Coached classes. Pick your hour."
         breadcrumb="/classes"
         intro={
           <>
-            Every class is coached, capped at twenty people, and starts on the
-            minute. Showing the schedule for{" "}
+            {/* Class capacity comes from each session's own spotsTotal, so
+                it is never asserted as a blanket number here. */}
+            Every class is coached and starts on the minute. Showing the
+            schedule for{" "}
             <b className="text-text">{location.name}</b>.
           </>
         }

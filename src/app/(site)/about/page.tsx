@@ -9,6 +9,7 @@ import {
   ABOUT_HERO_IMAGE,
   ABOUT_STATS,
   FACILITIES,
+  TRAINERS,
 } from "@/lib/fixtures/site-content";
 import { getLocations } from "@/lib/site-settings";
 
@@ -32,12 +33,15 @@ export default async function AboutPage() {
         breadcrumb="/about"
         headingWidth="18ch"
         intro={
+          /* Specific founding dates, member counts and coach counts were
+             placeholder copy from the design mock. Removed rather than
+             guessed — see CLIENT-CONTENT-REQUIRED in HANDOFF.md. */
           <>
-            Crunch Fitness started in 2018 with one floor in{" "}
-            {locations[0]?.short_name}, twelve members and a second-hand rack.
-            Today {locations.length === 2 ? "two gyms" : `${locations.length} gyms`},
-            1,800 members and fourteen coaches — same principle: the person on
-            the floor matters more than the equipment on it.
+            Crunch Fitness started with one floor in{" "}
+            {locations[0]?.short_name} and grew into{" "}
+            {locations.length === 2 ? "two gyms" : `${locations.length} gyms`}
+            {" "}— same principle throughout: the person on the floor matters
+            more than the equipment on it.
           </>
         }
       />
@@ -97,6 +101,7 @@ export default async function AboutPage() {
         </div>
       </Container>
 
+      {FACILITIES.length > 0 ? (
       <Section band="surface" className="mt-20">
         <Container className="reveal py-16">
           <div className="mb-[30px]">
@@ -131,7 +136,10 @@ export default async function AboutPage() {
           </div>
         </Container>
       </Section>
+      ) : null}
 
+      {/* Coaches hide until roles and branches are client-confirmed. */}
+      {TRAINERS.length > 0 ? (
       <Container className="reveal pt-[76px]">
         <div className="mb-[38px] text-center">
           <Eyebrow boxed className="mb-3.5">
@@ -147,7 +155,10 @@ export default async function AboutPage() {
         </div>
         <AboutTrainers />
       </Container>
+      ) : null}
 
+      {/* Stats band hides entirely rather than showing counts nobody measured. */}
+      {ABOUT_STATS.length > 0 ? (
       <Section band="accent" className="mt-20">
         <div className="mx-auto grid w-full max-w-content grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-8 px-5 py-14 text-center">
           {ABOUT_STATS.map((stat, index) => (
@@ -165,7 +176,9 @@ export default async function AboutPage() {
           ))}
         </div>
       </Section>
+      ) : null}
 
+      {ABOUT_GALLERY.length > 0 ? (
       <Container className="reveal pt-[76px]">
         <div className="mb-5">
           <Eyebrow className="mb-2.5">Inside the gyms</Eyebrow>
@@ -188,6 +201,7 @@ export default async function AboutPage() {
           ))}
         </div>
       </Container>
+      ) : null}
 
       <Section band="surface" className="mt-20 !border-b-0">
         <div className="mx-auto flex w-full max-w-content flex-wrap items-center justify-between gap-7 px-5 py-16">

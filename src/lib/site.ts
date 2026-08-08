@@ -12,7 +12,10 @@ export const SITE_DESCRIPTION =
 
 /** Legal / compliance strings shown in the footer and on invoices. */
 export const LEGAL = {
-  gstin: "07AABCU9603R1ZX",
+  // GSTIN is per-location (GST registration is state-wise) and lives in
+  // site_settings.gstin. It is NOT hardcoded here: the value that used to be
+  // was lifted from the design mock — a fabricated tax number on a real gym's
+  // site. The footer renders nothing until a real one is set.
   /** The disambiguation line the client asked for on every page. */
   disclaimer:
     "An independent Indian gym chain. Not affiliated with any international franchise of a similar name.",

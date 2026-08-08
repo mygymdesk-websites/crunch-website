@@ -28,7 +28,7 @@ const PUBLIC_COLUMNS = `
   phone, whatsapp, email,
   hours_summary, hours, closed_note,
   map_embed_url, map_link_url, latitude, longitude,
-  socials, mgd_location_id, is_default, display_order, hero_image_url
+  socials, mgd_location_id, gstin, is_default, display_order, hero_image_url
 `;
 
 interface SeedLocation {
@@ -53,6 +53,7 @@ interface SeedLocation {
   longitude: number | null;
   socials: LocationSocials;
   mgd_location_id: string | null;
+  gstin: string | null;
   is_default: boolean;
   display_order: number;
   hero_image_url: string | null;
@@ -89,6 +90,7 @@ function fromSeed(): SiteLocation[] {
       longitude: row.longitude ?? null,
       socials: row.socials ?? {},
       mgd_location_id: row.mgd_location_id ?? null,
+      gstin: row.gstin ?? null,
       is_default: row.is_default,
       display_order: row.display_order,
       hero_image_url: row.hero_image_url ?? null,
