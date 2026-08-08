@@ -107,6 +107,12 @@ const PUBLIC_ALLOWLIST = new Set([
 for (const [key, value] of Object.entries(env)) {
   if (!key.startsWith("NEXT_PUBLIC_")) continue;
 
+  // Vercel injects its own NEXT_PUBLIC_VERCEL_* system variables (commit
+  // message, branch, deployment URL). They are platform-owned rather than ours,
+  // and the commit message is legitimately multi-line — which failed every
+  // build the first time this check ran for real. Ours are the ones to police.
+  if (key.startsWith("NEXT_PUBLIC_VERCEL_")) continue;
+
   const raw = String(value ?? "");
 
   // A multi-line public value means a BLOCK of .env was pasted into a single
