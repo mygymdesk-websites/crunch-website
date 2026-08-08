@@ -104,14 +104,28 @@ function byDisplayOrder(a: SiteLocation, b: SiteLocation): number {
   );
 }
 
+/** Cache tag for the location read, invalidated when an admin saves. */
+export const SITE_SETTINGS_TAG = "site-settings";
+
 /**
  * All active locations, in display order.
  *
- * `cache()` dedupes this across a single render pass — the header, footer and
- * page body all ask for the list and get one round trip.
+ * Two layers of caching, doing different jobs:
+ *   - `cache()` dedupes within one render pass, so the header, footer, page
+ *     body and generateMetadata share a single read;
+ *   - the data cache (below) spans requests, so the database is not touched on
+ *     every page view. The location row changes when an admin edits it, which
+ *     revalidates the tag — so it is never meaningfully stale.
+ *
+ * This matters disproportionately: the read is on the critical path of every
+ * route, and the database is in Mumbai. Uncached, a function running in
+ * another region pays a cross-region round trip before it can render anything.
  */
 export const getLocations = cache(async (): Promise<SiteLocation[]> => {
-  const supabase = getPublicSupabase();
+  const supabase = getPublicSupabase({
+    revalidate: 300,
+    tags: [SITE_SETTINGS_TAG],
+  });
   if (!supabase) return fromSeed();
 
   const { data, error } = await supabase

@@ -26,34 +26,140 @@ Nothing of Part 1 was built — no booking modal, no Checkout mount, no error
 states. Building it blind against an unverifiable contract is exactly what the
 gate exists to prevent.
 
-### 🔴 Part 2 (navigation performance) — blocked on there being no deployment
+### 🔴 Part 2 (navigation performance) — superseded, see §0.0.2
 
-The brief requires diagnosis "on the deployed Vercel build (not localhost)".
-**There is no deployed build.** No Vercel project is linked (`.vercel/` absent),
-and `crunchfitness.in` currently serves the **legacy PHP site** via Cloudflare —
-the Phase 6 cutover has not happened.
-
-Standing up a deployment is outward-facing and needs secrets (MGD key, Supabase
-service role) pushed into a new Vercel project, so I have not done it
-unprompted. **Say the word and I will**, or link the project yourself and I will
-measure against it.
-
-I deliberately did NOT implement the perf fix off localhost numbers: the whole
-instruction was diagnose-then-fix, and shipping an unmeasured fix to a
-performance complaint is how you end up with a change nobody can prove helped.
-The suspected cause named in the brief (cookie reads forcing whole-route dynamic
-rendering) matches what I saw in Phase 2 — every route is `ƒ` — so the diagnosis
-is likely right; it just is not yet *measured*.
+This section recorded Part 2 as blocked because I believed no deployment
+existed. **That was wrong** — production is live at
+`crunch-website-taupe.vercel.app`. Diagnosis and fix are in §0.0.2.
 
 ### ✅ GO-LIVE BLOCKER CLEARED (unprompted good news)
 
 `NEXT_PUBLIC_SUPABASE_URL` is now **`db.crunchfitness.in`** — the Cloudflare
 proxy has landed. `npm run check:env` passes on its own merit.
 
-`ALLOW_RAW_SUPABASE_URL=true` is still in `.env.local` and is now **inert** (the
-check no longer fires). Left in place per instruction, but it should be deleted
-so a future regression to a raw URL cannot pass unnoticed in dev. `.env.local`
-is not committed, so this is a one-line local edit.
+`ALLOW_RAW_SUPABASE_URL` has since been **deleted entirely** (approved) — both
+the `.env.local` line and the escape hatch in `scripts/check-env.mjs`. There is
+now no way to pass the check with a raw `*.supabase.co` URL.
+
+---
+
+## 0.0.2 Part 2 — navigation performance
+
+**Status: diagnosed, fixed, verified locally. The production "after" number
+still needs a deploy.**
+
+### The measurement that mattered
+
+Production before (best of 5, after warm-up):
+
+| route | min | median | max |
+|---|---|---|---|
+| `/` | 7331 ms | 7385 ms | 7537 ms |
+| `/about` | 7362 ms | 7367 ms | 7443 ms |
+| `/classes` | 7347 ms | 7381 ms | 7420 ms |
+| `/packages` | 7315 ms | 7373 ms | 7481 ms |
+| `/shop` | 7361 ms | 7416 ms | 7453 ms |
+| `/contact` | 7381 ms | 7499 ms | 7590 ms |
+| `/policies/refund` | 7300 ms | 7331 ms | 7476 ms |
+
+Flat to within 3% across every route — which is the whole clue. A *variable*
+cost (more data on `/shop`, none on `/policies`) would not be flat. A flat cost
+is a fixed toll every request pays.
+
+Three probes against the same production deployment localised it:
+
+| path | result | what it rules out |
+|---|---|---|
+| `/sitemap.xml` (static) | 200 in **69 ms** | CDN and network are fine |
+| `/robots.txt` (static) | 200 in **129 ms** | ditto |
+| `/api/enquiries` (POST-only) | 405 in **332 ms** | **function cold start is fine** — this boots Node and routes, then returns *before* rendering the layout |
+| `/` (page) | 200 in **7367 ms** | the ~7.0 s is the render's data reads |
+
+So: not the network, not the cold start, not the bundle. The cost is data
+fetching inside the render, and it is paid on every route.
+
+### Root cause
+
+Two things compounding:
+
+1. **The location read was uncached and on the critical path of every page.**
+   `getLocations()` feeds the header, the footer, the location switcher and
+   `generateMetadata`. `cache()` deduped it *within* one render, but nothing
+   cached it *across* requests — so every single page view hit the database
+   before it could render anything.
+
+2. **The function executes in the wrong hemisphere.** `X-Vercel-Id:
+   bom1::iad1::…` — the request enters the Mumbai edge and is then executed in
+   `iad1` (US East), while both Supabase (`db.crunchfitness.in`) and MyGymDesk
+   (`db.mygymdesk.in`) are in Mumbai. Every one of those reads was a round trip
+   to India and back.
+
+The clincher for (1): `/contact` and `/policies/refund` make **zero** MyGymDesk
+calls, yet cost exactly what `/classes` costs. The MGD reads were already
+cached in Phase 2 (proven then: 10 page loads, 0 API requests). The only
+uncached read left was the shared Supabase one — which is why the number is
+identical everywhere.
+
+### The fix
+
+| change | addresses |
+|---|---|
+| `getLocations()` now uses Next's data cache, `revalidate: 300`, tagged `site-settings` | (1) — the database is off the per-request path |
+| `updateTag(SITE_SETTINGS_TAG)` in the admin save action | keeps (1) correct: an admin sees their own edit on the very next render |
+| `vercel.json` → `"regions": ["bom1"]` | (2) — function runs next to both databases |
+| `src/app/(site)/loading.tsx` | perceived paint: a click responds immediately instead of sitting on the old page |
+
+Note on the Next 16 API: `revalidateTag` now requires a cache-life profile as a
+second argument, and `updateTag` is the Server-Action variant with
+read-your-own-writes semantics. `updateTag` is the correct one here — an admin
+must not have to save twice to see their change.
+
+### Evidence
+
+**The caching lever, isolated.** Same production build, same machine, same
+remote database, with and without the data cache — so geography is held
+constant and only the per-request read varies:
+
+| route | uncached | cached |
+|---|---|---|
+| `/` | 66 ms | **18 ms** |
+| `/about` | 66 ms | **14 ms** |
+| `/classes` | 108 ms | **18 ms** |
+| `/packages` | 64 ms | **19 ms** |
+| `/shop` | 67 ms | **14 ms** |
+| `/contact` | 66 ms | **16 ms** |
+| `/policies/refund` | 110 ms | **15 ms** |
+
+That ~50 ms is one Supabase round trip *from India*. From Virginia the same
+round trip is the multi-second toll seen in production.
+
+**The cache is real and correctly tagged.** With `NEXT_PRIVATE_DEBUG_CACHE=1`:
+
+```
+FileSystemCache: get 9d8cd6fc… [ 'site-settings' ] FETCH false   ← miss
+FileSystemCache: get 9d8cd6fc… [ 'site-settings' ] FETCH true    ← hit
+FileSystemCache: get 9d8cd6fc… [ 'site-settings' ] FETCH true    ← hit (different route)
+```
+
+One entry, shared across routes, carrying the exact tag `updateTag` clears.
+
+### What is NOT yet proven
+
+The production "after" number. The branch preview sits behind Vercel Deployment
+Protection (302 to SSO), and `crunch-website` is not visible to my Vercel token
+— it is not in the team the token can see, and there is no `.vercel/` link in
+the repo. So I can measure production (public) but not the preview.
+
+Expected after the deploy: pages land near the **332 ms** floor that
+`/api/enquiries` already demonstrates on that same infrastructure, since that
+floor is function-boot-plus-routing with no data reads — and there are now
+effectively no data reads on the hot path.
+
+One item to eyeball on the first real admin save: the end-to-end
+save→invalidate path. I proved the cache entry carries the right tag, but could
+not drive the admin UI to completion (sign-in is emailed OTP, and minting a
+session token was blocked). Worst case if `updateTag` misbehaves is bounded and
+self-healing: an edit takes up to 5 minutes to appear. No data risk.
 
 ---
 
@@ -539,12 +645,12 @@ Only the guardrail the brief asked for as permanent tooling, because it needs to
 exist *before* a URL is pasted, and it involves no guessing:
 
 - **`npm run check:env`** (`scripts/check-env.mjs`), wired into `npm run verify`.
-  Fails the build on a raw `*.supabase.co` URL, with `ALLOW_RAW_SUPABASE_URL=true`
-  as a local-dev-only escape hatch that is ignored for production builds. Also
-  fails on any server secret behind a `NEXT_PUBLIC_*` name, and on an
-  `mgd_live_…` or service-role value pasted into a public variable.
-  Verified across six cases: no-env, raw URL, raw URL + opt-out, raw URL +
-  production, proxied domain, and a leaked key.
+  Fails the build on a raw `*.supabase.co` URL. Also fails on any server secret
+  behind a `NEXT_PUBLIC_*` name, and on an `mgd_live_…` or service-role value
+  pasted into a public variable.
+  *(Originally shipped with an `ALLOW_RAW_SUPABASE_URL=true` local-dev hatch;
+  that hatch was **removed entirely** in Phase 3 — see §0.0.2. A raw URL now
+  fails everywhere, dev included.)*
 - `.env.example` documents the new vars, the key's once-only nature, and the
   proxied-domain requirement.
 
@@ -553,10 +659,9 @@ migrations were applied, and no MGD wiring was written.
 
 ### GO-LIVE BLOCKER
 
-If the Cloudflare proxy for the client's Supabase project is not ready and local
-dev proceeds on a raw `*.supabase.co` URL via `ALLOW_RAW_SUPABASE_URL=true`,
-**that must not reach production.** `check:env` enforces it on production builds,
-but the proxy still has to be set up before launch.
+**CLEARED.** The Cloudflare proxy landed (`db.crunchfitness.in`) and the
+`ALLOW_RAW_SUPABASE_URL` hatch has been deleted, so there is no longer any way
+to build — in dev or production — against a raw `*.supabase.co` URL.
 
 ---
 
