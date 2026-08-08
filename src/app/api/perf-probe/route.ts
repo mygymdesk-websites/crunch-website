@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { mgd } from "@/lib/mgd";
 import { getLocations } from "@/lib/site-settings";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/config";
+import { getPublicSupabase } from "@/lib/supabase/server";
 
 /**
  * TEMPORARY diagnostic — Phase 3 Part 2. Delete once the render cost is found.
@@ -116,6 +117,46 @@ export async function GET(request: Request) {
         signal: AbortSignal.timeout(20_000),
       });
       return { status: res.status };
+    }),
+  );
+
+  // 4b. Reachability WITHOUT any apikey header. The steps above threw while
+  //     CONSTRUCTING the headers, so they never opened a socket — the host was
+  //     never actually tested. A 401 here is a good answer: it proves the hop
+  //     works and tells us what it costs.
+  steps.push(
+    await time("supabase root (no apikey)", async () => {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(25_000),
+      });
+      return { status: res.status };
+    }),
+  );
+
+  // 4c. Same hop with the key sanitised to its first line, which is what the
+  //     anon JWT actually is. Isolates "network is slow" from "env var is bad".
+  steps.push(
+    await time("site_settings_public (sanitised key)", async () => {
+      const key = SUPABASE_ANON_KEY.split("\n")[0].trim();
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/site_settings_public?select=id&limit=1`,
+        {
+          headers: { apikey: key, authorization: `Bearer ${key}` },
+          cache: "no-store",
+          signal: AbortSignal.timeout(25_000),
+        },
+      );
+      const rows = (await res.json().catch(() => null)) as unknown[] | null;
+      return { status: res.status, rowCount: Array.isArray(rows) ? rows.length : null };
+    }),
+  );
+
+  // 4d. Where inside getLocations() the time goes: client construction vs query.
+  steps.push(
+    await time("getPublicSupabase() construction", async () => {
+      const sb = getPublicSupabase();
+      return { built: sb !== null };
     }),
   );
 
