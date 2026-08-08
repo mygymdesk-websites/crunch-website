@@ -137,8 +137,8 @@ on a client component away from being published to every visitor.
 mistake — but `"build": "next build"` never invoked it, so it only ever ran
 locally via `npm run verify`. On Vercel it has never run once.
 
-Now fixed: `build` runs `check:env` first, and the check has been taught this
-failure. It rejects any `NEXT_PUBLIC_*` value containing a line break or a
+Now fixed: `"build": "node scripts/check-env.mjs && next build"`, so Vercel runs
+it on every deploy, and the check has been taught this failure. It rejects any `NEXT_PUBLIC_*` value containing a line break or a
 `KEY=VALUE` assignment, and requires the anon key to be a single well-formed
 JWT. Verified against the exact production shape — it fails with both messages,
 and the correct value still passes.

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/check-env.mjs && next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
@@ -14,7 +14,7 @@
     "check:locations": "node scripts/check-hardcoded-locations.mjs",
     "check:mgd-key": "node scripts/check-mgd-key-isolation.mjs",
     "check:env": "node scripts/check-env.mjs",
-    "verify": "npm run seed:generate && npm run check:locations && npm run check:mgd-key && npm run check:env && npm run typecheck && npm run test && npm run build"
+    "verify": "npm run seed:generate && npm run check:locations && npm run check:mgd-key && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
