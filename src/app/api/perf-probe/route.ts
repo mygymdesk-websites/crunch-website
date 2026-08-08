@@ -24,8 +24,7 @@ export const dynamic = "force-dynamic";
 /** Error identity without any environment value that may be embedded in it. */
 function redact(error: unknown): string {
   if (!(error instanceof Error)) return "non-error thrown";
-  const firstLine = error.message.split("
-")[0] ?? "";
+  const firstLine = error.message.split("\n")[0] ?? "";
   const shape = firstLine
     .replace(/eyJ[A-Za-z0-9._-]+/g, "<jwt>")
     .replace(/[A-Z_]+=\S+/g, "<env-assignment>")
@@ -140,7 +139,7 @@ export async function GET(request: Request) {
   steps.push(
     await time("mgd getClassCatalog() [real]", async () => {
       const res = await mgd().getClassCatalog();
-      return { types: res?.classTypes?.length ?? null };
+      return { types: res?.classes?.length ?? null };
     }),
   );
 
