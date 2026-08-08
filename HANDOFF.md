@@ -160,6 +160,33 @@ They were not the root cause, but they are correct and stay:
   function should not run in Virginia.
 - **`loading.tsx`** gives navigation an immediate response.
 
+### A regression I introduced and caught
+
+The first version of the perf fix put `loading.tsx` at the `(site)` group root.
+That turned **every unknown URL into a soft 404**: unknown paths started
+answering HTTP 200 instead of 404.
+
+A loading boundary makes Next start streaming the response, which commits the
+HTTP status before the page body runs — so by the time the catch-all calls
+`notFound()`, 200 has already been sent. Measured both ways on the same
+production build:
+
+| | `/nope-not-real` |
+|---|---|
+| with `(site)/loading.tsx` | **200** |
+| without it | **404** |
+
+Fixed by scoping the boundary to routes with no `notFound()` path beneath them:
+`classes/loading.tsx` and `packages/loading.tsx` only. `/shop` and `/policies`
+deliberately have none, because each has a `[slug]` child that calls
+`notFound()`. Verified after the change: `/nope-not-real`, `/policies/not-a-policy`
+and `/shop/not-a-product` all return 404, while `/`, `/classes`, `/packages` and
+`/shop` all return 200.
+
+Worth stating plainly because it was live on production for roughly half an
+hour, and because it is a trap worth remembering: **a `loading.tsx` above a
+route that can 404 silently converts it into a soft 200.**
+
 ### Still owed
 
 The production before/after table. "After" is meaningless until the env var is
