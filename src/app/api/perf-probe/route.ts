@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { mgd } from "@/lib/mgd";
+import { getLocations } from "@/lib/site-settings";
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 
 /**
@@ -19,6 +21,18 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase/config";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** Error identity without any environment value that may be embedded in it. */
+function redact(error: unknown): string {
+  if (!(error instanceof Error)) return "non-error thrown";
+  const firstLine = error.message.split("
+")[0] ?? "";
+  const shape = firstLine
+    .replace(/eyJ[A-Za-z0-9._-]+/g, "<jwt>")
+    .replace(/[A-Z_]+=\S+/g, "<env-assignment>")
+    .slice(0, 120);
+  return `${error.name}: ${shape}`;
+}
+
 async function time<T>(label: string, fn: () => Promise<T>) {
   const started = Date.now();
   try {
@@ -29,11 +43,9 @@ async function time<T>(label: string, fn: () => Promise<T>) {
       label,
       ms: Date.now() - started,
       ok: false,
-      error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
-      cause:
-        error instanceof Error && error.cause
-          ? String((error.cause as { message?: string }).message ?? error.cause)
-          : undefined,
+      // Redacted: the failure mode here embeds the offending env VALUE in the
+      // message. Report the shape of the error, never its contents.
+      error: redact(error),
     };
   }
 }
@@ -105,6 +117,30 @@ export async function GET(request: Request) {
         signal: AbortSignal.timeout(20_000),
       });
       return { status: res.status };
+    }),
+  );
+
+  // 5. The actual function every page's layout awaits.
+  steps.push(
+    await time("getLocations() [real]", async () => {
+      const rows = await getLocations();
+      return { count: rows.length, firstSlug: rows[0]?.slug ?? null };
+    }),
+  );
+
+  // 6. Second call — cache/dedupe behaviour.
+  steps.push(
+    await time("getLocations() [2nd]", async () => {
+      const rows = await getLocations();
+      return { count: rows.length };
+    }),
+  );
+
+  // 7. A cached MyGymDesk display read, as the class pages perform it.
+  steps.push(
+    await time("mgd getClassCatalog() [real]", async () => {
+      const res = await mgd().getClassCatalog();
+      return { types: res?.classTypes?.length ?? null };
     }),
   );
 
