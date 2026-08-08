@@ -16,7 +16,7 @@ import { useEnquiry, validateEnquiry } from "@/lib/use-enquiry";
 /** "Send us a message" — the main contact form, with its sending/done states. */
 export function ContactForm() {
   const { locations, location } = useLocation();
-  const { phase, error, submit, reset } = useEnquiry("contact_form");
+  const { phase, error, errorField, submit, reset } = useEnquiry("contact_form");
   const fieldId = useId();
 
   const [values, setValues] = useState({
@@ -109,6 +109,7 @@ export function ContactForm() {
               required
               value={values.name}
               onChange={(e) => set("name", e.target.value)}
+              error={errorField === "name" ? error : null}
             />
             <Input
               id={`${fieldId}-phone`}
@@ -120,6 +121,7 @@ export function ContactForm() {
               required
               value={values.phone}
               onChange={(e) => set("phone", e.target.value)}
+              error={errorField === "phone" ? error : null}
             />
           </div>
 
@@ -131,6 +133,7 @@ export function ContactForm() {
             autoComplete="email"
             value={values.email}
             onChange={(e) => set("email", e.target.value)}
+            error={errorField === "email" ? error : null}
           />
 
           <div className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-[13px]">
@@ -189,7 +192,7 @@ export function ContactForm() {
             className="absolute -left-[9999px] h-px w-px opacity-0"
           />
 
-          {clientError ?? error ? (
+          {clientError ?? (errorField ? null : error) ? (
             <p className="m-0 text-[12px] text-accent" role="alert">
               {clientError ?? error}
             </p>

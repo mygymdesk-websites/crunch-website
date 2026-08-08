@@ -27,9 +27,18 @@
       "email": "vasantkunj@crunchfitness.in",
       "hours_summary": "Mon–Sun · 05:30 – 22:30",
       "hours": [
-        { "label": "Monday – Friday", "value": "05:30 – 22:30" },
-        { "label": "Saturday", "value": "06:00 – 21:00" },
-        { "label": "Sunday", "value": "07:00 – 14:00" }
+        {
+          "label": "Monday – Friday",
+          "value": "05:30 – 22:30"
+        },
+        {
+          "label": "Saturday",
+          "value": "06:00 – 21:00"
+        },
+        {
+          "label": "Sunday",
+          "value": "07:00 – 14:00"
+        }
       ],
       "closed_note": "Closed on Holi, Diwali and Independence Day.",
       "map_embed_url": null,
@@ -37,7 +46,7 @@
       "latitude": null,
       "longitude": null,
       "socials": {},
-      "mgd_location_id": null,
+      "mgd_location_id": "c53f2dc1-8889-46d7-8589-2f4c40119840",
       "is_active": true,
       "is_default": true,
       "display_order": 1,
@@ -58,9 +67,18 @@
       "email": "gurgaon@crunchfitness.in",
       "hours_summary": "Mon–Sun · 06:00 – 22:00",
       "hours": [
-        { "label": "Monday – Friday", "value": "06:00 – 22:00" },
-        { "label": "Saturday", "value": "06:00 – 21:00" },
-        { "label": "Sunday", "value": "07:00 – 13:00" }
+        {
+          "label": "Monday – Friday",
+          "value": "06:00 – 22:00"
+        },
+        {
+          "label": "Saturday",
+          "value": "06:00 – 21:00"
+        },
+        {
+          "label": "Sunday",
+          "value": "07:00 – 13:00"
+        }
       ],
       "closed_note": "Closed on Holi, Diwali and Independence Day.",
       "map_embed_url": null,
@@ -68,7 +86,7 @@
       "latitude": null,
       "longitude": null,
       "socials": {},
-      "mgd_location_id": null,
+      "mgd_location_id": "297b62e2-8fcf-4983-b9fd-12d358bc414d",
       "is_active": true,
       "is_default": false,
       "display_order": 2,

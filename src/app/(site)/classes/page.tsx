@@ -110,13 +110,20 @@ export default async function ClassesPage() {
 }
 
 async function CatalogSection({ location }: { location: SiteLocation }) {
-  const { classes } = await getClassCatalog(location);
-  return <ClassCatalog classes={classes} />;
+  const { data } = await getClassCatalog(location);
+  return <ClassCatalog classes={data} />;
 }
 
 async function TimetableSection({ location }: { location: SiteLocation }) {
-  const { sessions } = await getClassSessions(location);
+  // `fresh` is deliberately NOT set here: this is a display read, so it uses
+  // the 15-minute cache. Phase 3's booking flow re-reads with fresh: true
+  // immediately before creating an order, because a session id rolls forward.
+  const { data, degraded } = await getClassSessions(location);
   return (
-    <Timetable sessions={sessions} locationShortName={location.short_name} />
+    <Timetable
+      sessions={data}
+      locationShortName={location.short_name}
+      degraded={degraded}
+    />
   );
 }

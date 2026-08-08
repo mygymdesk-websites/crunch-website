@@ -19,6 +19,7 @@ import type {
   MembershipPurchaseRequest,
   MembershipPurchaseResponse,
   PlansResponse,
+  ProductQuery,
   ProductsResponse,
   ServiceSessionsResponse,
   ServicesCatalogResponse,
@@ -102,6 +103,34 @@ export class MgdApi {
     return this.client.request<CaptureLeadResponse>("capture-website-lead", {
       method: "POST",
       body,
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Shop catalogue  *(1.4)*
+  // -------------------------------------------------------------------------
+
+  /**
+   * Published shop products with live stock status.
+   *
+   * Only products the owner has explicitly published to the website appear —
+   * POS-only inventory never leaks. `price` is the ALL-IN charged amount, so
+   * display it as-is. `mrp` is omitted unless it is above `price`.
+   *
+   * Stock is tri-state (`in_stock` / `low_stock` / `out_of_stock`) and exact
+   * quantities are never exposed — a "only 3 left" badge would be invented.
+   */
+  async getProducts(query: ProductQuery = {}): Promise<ProductsResponse> {
+    return this.client.request<ProductsResponse>("website-products", {
+      query: {
+        location_id: query.locationId,
+        category_id: query.categoryId,
+        brand: query.brand,
+        // Drops only out_of_stock; low_stock stays visible.
+        in_stock_only: query.inStockOnly ? "true" : undefined,
+      },
+      revalidate: DISPLAY_REVALIDATE_SECONDS,
+      tags: [MGD_TAGS.products],
     });
   }
 
@@ -193,13 +222,22 @@ export class MgdApi {
   async getSessionPrice(args: {
     sessionId: string;
     bookingType: BookingType;
+    /**
+     * Classes only, where it is an accepted no-op. Sending it with
+     * `booking_type=service` is `422 member_pricing_unsupported` as of 1.3 —
+     * this client refuses to send it rather than letting the API reject the
+     * request, because the same mistake on `website-booking-order` used to
+     * mint an order at the member rate and then fail the booking on
+     * `amount_mismatch` AFTER the customer had paid.
+     */
     isMember?: boolean;
   }): Promise<SessionPriceResponse> {
     return this.client.request<SessionPriceResponse>("website-session-price", {
       query: {
         session_id: args.sessionId,
         booking_type: args.bookingType,
-        is_member: args.isMember ? "true" : undefined,
+        is_member:
+          args.isMember && args.bookingType === "class" ? "true" : undefined,
       },
       // Prices feed a checkout screen; a stale one produces amount_mismatch.
       revalidate: false,
@@ -221,9 +259,17 @@ export class MgdApi {
   async createBookingOrder(
     input: BookingOrderRequest,
   ): Promise<BookingOrderResponse> {
+    // Member pricing was removed from this API in 1.3. Stripping it for
+    // services rather than forwarding it keeps a money bug closed: the order
+    // used to be minted at the member rate while the booking charges the
+    // non-member rate, so the customer paid and was then refused with
+    // `amount_mismatch`.
+    const body: BookingOrderRequest = { ...input };
+    if (body.booking_type === "service") delete body.is_member;
+
     return this.client.request<BookingOrderResponse>("website-booking-order", {
       method: "POST",
-      body: input,
+      body,
     });
   }
 
@@ -259,17 +305,6 @@ export class MgdApi {
   // throws MgdNotYetLiveError today; when the endpoint deploys, delete the
   // throw and uncomment the request line beneath it.
   // -------------------------------------------------------------------------
-
-  /** A1 — shop catalog from MGD inventory. Lands in Phase 2 (Track A). */
-  async getProducts(options: LocationFilter = {}): Promise<ProductsResponse> {
-    void options;
-    throw new MgdNotYetLiveError("website-products", "Phase 2 (Track A · A1)");
-    // return this.client.request<ProductsResponse>("website-products", {
-    //   query: { location_id: options.locationId },
-    //   revalidate: DISPLAY_REVALIDATE_SECONDS,
-    //   tags: [MGD_TAGS.products],
-    // });
-  }
 
   /** A2 — create a Razorpay order for a shop cart. Lands in Phase 5. */
   async createShopOrder(

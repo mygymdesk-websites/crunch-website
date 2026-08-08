@@ -53,7 +53,7 @@ function TrialForm({
   onClose: () => void;
 }) {
   const { locations, location } = useLocation();
-  const { phase, error, submit } = useEnquiry("trial_modal");
+  const { phase, error, errorField, filedAt, submit } = useEnquiry("trial_modal");
   const fieldId = useId();
 
   const [values, setValues] = useState({
@@ -104,7 +104,9 @@ function TrialForm({
         </h2>
         <p className="m-0 mb-6 text-[15px] text-muted">
           We&rsquo;ll WhatsApp you shortly to confirm your slot at{" "}
-          {chosenLocation.name}.
+          {/* The branch MyGymDesk actually filed against — it should agree
+              with what was picked, and the echo is the proof that it did. */}
+          {filedAt ?? chosenLocation.name}.
         </p>
         <Button onClick={onClose} size="sm">
           Done
@@ -148,6 +150,7 @@ function TrialForm({
               required
               value={values.name}
               onChange={(e) => set("name")(e.target.value)}
+              error={errorField === "name" ? error : null}
             />
 
             <div className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-3">
@@ -161,6 +164,7 @@ function TrialForm({
                 required
                 value={values.phone}
                 onChange={(e) => set("phone")(e.target.value)}
+                error={errorField === "phone" ? error : null}
               />
               <Input
                 id={`${fieldId}-email`}
@@ -170,6 +174,7 @@ function TrialForm({
                 autoComplete="email"
                 value={values.email}
                 onChange={(e) => set("email")(e.target.value)}
+                error={errorField === "email" ? error : null}
               />
             </div>
 
@@ -221,7 +226,9 @@ function TrialForm({
               className="absolute -left-[9999px] h-px w-px opacity-0"
             />
 
-            {clientError ?? error ? (
+            {/* Field-level errors render on the field itself; only
+                form-level ones repeat here. */}
+            {clientError ?? (errorField ? null : error) ? (
               <p className="m-0 text-[12px] text-accent" role="alert">
                 {clientError ?? error}
               </p>

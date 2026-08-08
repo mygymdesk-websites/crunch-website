@@ -10,21 +10,35 @@ import {
   type ReactNode,
 } from "react";
 
-import { PRODUCT_FIXTURES, type ProductFixture } from "@/lib/fixtures/products";
+import type { MgdProduct } from "@/lib/mgd/types";
 import { CART_STORAGE_KEY } from "@/lib/site";
 import { useHydrated } from "@/lib/use-hydrated";
+
+/**
+ * What the cart remembers about a product.
+ *
+ * A SNAPSHOT taken at add-time, not a live lookup. The cart drawer is global —
+ * it renders on every page — and product data now comes from MyGymDesk, which
+ * only the server may call. Snapshotting keeps the drawer working without
+ * fetching the whole catalogue on every page view.
+ *
+ * The price here is for DISPLAY only. Checkout re-resolves every price from
+ * MyGymDesk server-side (Phase 5), and `product.price` is the all-in charged
+ * amount, so a stale snapshot can never become the amount charged.
+ */
+export interface CartSnapshot {
+  name: string;
+  brand: string | null;
+  size: string | null;
+  price: number;
+  currency: string;
+  imageUrl: string | null;
+}
 
 export interface CartLine {
   productId: string;
   qty: number;
-}
-
-export interface ResolvedCartLine extends CartLine {
-  product: ProductFixture;
-  unitPrice: number;
-  lineTotal: number;
-  /** Stock at the currently selected location. */
-  stock: number;
+  snapshot: CartSnapshot;
 }
 
 interface CartContextValue {
@@ -33,12 +47,10 @@ interface CartContextValue {
   isOpen: boolean;
   openCart: () => void;
   closeCart: () => void;
-  add: (productId: string, qty?: number) => void;
+  add: (product: MgdProduct, qty?: number) => void;
   setQty: (productId: string, qty: number) => void;
   remove: (productId: string) => void;
   clear: () => void;
-  /** Resolve lines against the catalog and a location's stock. */
-  resolve: (locationSlug: string) => ResolvedCartLine[];
   hydrated: boolean;
 }
 
@@ -47,23 +59,17 @@ const CartContext = createContext<CartContextValue | null>(null);
 /** Per-line cap, matching the design's quantity stepper. */
 const MAX_QTY = 10;
 
-/**
- * Cart state, held in localStorage.
- *
- * Phase 1 is UI only — nothing is charged and no order is written. The shape
- * here (product id + qty, priced at render time from the catalog) is the same
- * one Phase 5 needs, because the server re-resolves every price from MyGymDesk
- * at checkout regardless. A client-side price is a display convenience, never
- * an input to a payment.
- */
-/**
- * Read and sanitise the stored cart.
- *
- * Runs in a `useState` initialiser, so it happens during the first client
- * render rather than in an effect. Nothing renders cart contents until
- * `hydrated` is true, so the server and hydration passes still produce
- * identical markup.
- */
+function snapshotOf(product: MgdProduct): CartSnapshot {
+  return {
+    name: product.name,
+    brand: product.brand,
+    size: product.size,
+    price: product.price,
+    currency: product.currency,
+    imageUrl: product.imageUrl,
+  };
+}
+
 function readStoredCart(): CartLine[] {
   if (typeof window === "undefined") return [];
   try {
@@ -73,21 +79,24 @@ function readStoredCart(): CartLine[] {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
 
-    return parsed
-      .filter(
-        (l): l is CartLine =>
-          !!l &&
-          typeof (l as CartLine).productId === "string" &&
-          Number.isFinite((l as CartLine).qty),
-      )
-      // Drop lines for products that no longer exist.
-      .filter((l) => PRODUCT_FIXTURES.some((p) => p.id === l.productId))
-      .map((l) => ({
-        productId: l.productId,
-        qty: Math.min(Math.max(1, Math.trunc(l.qty)), MAX_QTY),
-      }));
+    return parsed.flatMap((entry): CartLine[] => {
+      if (!entry || typeof entry !== "object") return [];
+      const line = entry as Partial<CartLine>;
+      if (typeof line.productId !== "string") return [];
+      if (!Number.isFinite(line.qty)) return [];
+      // Lines written before the live-product swap have no snapshot; drop them
+      // rather than render a cart row with no name or price.
+      if (!line.snapshot || typeof line.snapshot.name !== "string") return [];
+
+      return [
+        {
+          productId: line.productId,
+          qty: Math.min(Math.max(1, Math.trunc(line.qty as number)), MAX_QTY),
+          snapshot: line.snapshot as CartSnapshot,
+        },
+      ];
+    });
   } catch {
-    // Corrupt or unavailable storage — start with an empty cart.
     return [];
   }
 }
@@ -106,17 +115,29 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, [lines, hydrated]);
 
-  const add = useCallback((productId: string, qty = 1) => {
+  const add = useCallback((product: MgdProduct, qty = 1) => {
     setLines((current) => {
-      const existing = current.find((l) => l.productId === productId);
+      const existing = current.find((l) => l.productId === product.id);
       if (existing) {
         return current.map((l) =>
-          l.productId === productId
-            ? { ...l, qty: Math.min(l.qty + qty, MAX_QTY) }
+          l.productId === product.id
+            ? // Refresh the snapshot on re-add so a price change is picked up.
+              {
+                ...l,
+                qty: Math.min(l.qty + qty, MAX_QTY),
+                snapshot: snapshotOf(product),
+              }
             : l,
         );
       }
-      return [...current, { productId, qty: Math.min(qty, MAX_QTY) }];
+      return [
+        ...current,
+        {
+          productId: product.id,
+          qty: Math.min(qty, MAX_QTY),
+          snapshot: snapshotOf(product),
+        },
+      ];
     });
     setOpen(true);
   }, []);
@@ -139,24 +160,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clear = useCallback(() => setLines([]), []);
 
-  const resolve = useCallback(
-    (locationSlug: string): ResolvedCartLine[] =>
-      lines.flatMap((line) => {
-        const product = PRODUCT_FIXTURES.find((p) => p.id === line.productId);
-        if (!product) return [];
-        return [
-          {
-            ...line,
-            product,
-            unitPrice: product.price,
-            lineTotal: product.price * line.qty,
-            stock: product.stockBySlug[locationSlug] ?? 0,
-          },
-        ];
-      }),
-    [lines],
-  );
-
   const value = useMemo<CartContextValue>(
     () => ({
       lines,
@@ -168,10 +171,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
       setQty,
       remove,
       clear,
-      resolve,
       hydrated,
     }),
-    [lines, isOpen, add, setQty, remove, clear, resolve, hydrated],
+    [lines, isOpen, add, setQty, remove, clear, hydrated],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

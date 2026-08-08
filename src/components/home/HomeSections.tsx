@@ -30,9 +30,18 @@ import {
 import type { MgdClassType, MgdPlan } from "@/lib/mgd/types";
 import { useEnquiry, validateEnquiry } from "@/lib/use-enquiry";
 
-/** "On the schedule at {location}" — class cards for the selected gym. */
+/**
+ * "On the schedule at {location}" — class cards for the selected gym.
+ *
+ * Hidden entirely when there is nothing to show. The homepage is a shop
+ * window: a section heading promising classes, sitting above an empty grid,
+ * is worse than no section at all. The Classes page is where a visitor who
+ * went looking gets the explanatory empty state.
+ */
 export function HomeClasses({ classes }: { classes: MgdClassType[] }) {
   const { location } = useLocation();
+
+  if (classes.length === 0) return null;
 
   return (
     <Container className="reveal pt-[72px]">
@@ -137,12 +146,32 @@ export function HomeWhyUs() {
   );
 }
 
-/** Pricing cards. `price: 0` renders "Contact us", per the MGD contract. */
-export function HomePackages({ plans }: { plans: MgdPlan[] }) {
+/**
+ * Pricing cards. `price: 0` renders "Contact us", per the MGD contract.
+ *
+ * Hidden when the gym has published nothing — same reasoning as HomeClasses.
+ * The Packages page carries the explanatory empty state.
+ */
+export function HomePackages({
+  plans,
+  ptPlans = [],
+}: {
+  plans: MgdPlan[];
+  /** Service packages, used for the "PT from ₹X" line. */
+  ptPlans?: MgdPlan[];
+}) {
   // The homepage shows the three recurring plans; the day pass lives on the
   // Packages page where the full list is.
   const shown = plans.filter((p) => p.interval !== "day_pass").slice(0, 3);
   const dayPass = plans.find((p) => p.interval === "day_pass");
+
+  // Cheapest priced PT block, so the "from" figure is the gym's real one.
+  // `price: 0` means "no price set", so those rows are excluded rather than
+  // making this read "from ₹0".
+  const ptPrices = ptPlans.map((p) => p.price).filter((price) => price > 0);
+  const ptFrom = ptPrices.length > 0 ? Math.min(...ptPrices) : null;
+
+  if (shown.length === 0) return null;
 
   return (
     <Container id="packages" className="reveal pt-[72px]">
@@ -202,11 +231,15 @@ export function HomePackages({ plans }: { plans: MgdPlan[] }) {
         ))}
       </div>
 
+      {/* Every figure here comes from the API — nothing is asserted about the
+          gym's prices that the gym did not publish. */}
       <p className="m-0 mt-[22px] text-center text-[13px] text-muted">
         {dayPass && dayPass.price > 0
           ? `Day pass ${formatINR(dayPass.price)} · `
           : null}
-        Personal training from ₹800 a session ·{" "}
+        {ptFrom !== null
+          ? `Personal training from ${formatINR(ptFrom)} a session · `
+          : null}
         <Link href="/packages" className="border-b border-line">
           Compare all plans
         </Link>

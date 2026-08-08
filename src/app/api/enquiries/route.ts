@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 
 import { isValidEmail, isValidIndianMobile, toE164 } from "@/lib/format";
+import { MgdError, mgd } from "@/lib/mgd";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
 import { getLocations } from "@/lib/site-settings";
 import { getServiceSupabase } from "@/lib/supabase/server";
-import type { EnquiryInsert, EnquirySource } from "@/lib/supabase/types";
+import type {
+  EnquiryInsert,
+  EnquirySource,
+  MgdSyncStatus,
+} from "@/lib/supabase/types";
 
 /**
  * POST /api/enquiries — every lead the website captures.
@@ -12,15 +17,22 @@ import type { EnquiryInsert, EnquirySource } from "@/lib/supabase/types";
  * Used by the Book Free Trial modal, the contact form, the homepage
  * appointment form and the PT enquiry card.
  *
- * PHASE 1 SCOPE: writes the `enquiries` mirror only.
- * PHASE 2 adds the MyGymDesk forward (`capture-website-lead`) at the marked
- * point below — mirror first, then forward, so a lead is never lost when MGD
- * is rate-limited or down. Rows land with mgd_sync_status='pending' and stay
- * replayable.
+ * Order of operations, and why:
  *
- * The database write goes through the service role deliberately: `anon` has no
- * INSERT privilege on `enquiries`, because a public form posting straight into
- * a table is how you end up with a spam table.
+ *   1. Honeypot, throttle, validate — cheap rejections first, before either
+ *      system is touched. The MyGymDesk API has no spam protection of its own
+ *      and every endpoint shares one hourly budget per key.
+ *
+ *   2. MIRROR FIRST, then forward. The local row is written before the MGD
+ *      call so a lead is never lost to a rate limit, a timeout, or an outage.
+ *      Rows land `pending` and are replayable from the admin list.
+ *
+ *   3. Forward to `capture-website-lead` with the visitor's chosen branch,
+ *      then stamp the outcome back onto the row.
+ *
+ *   4. A forwarding failure does NOT fail the request when the mirror is
+ *      safe — the enquiry genuinely was received. The visitor is told the
+ *      truth either way; the difference is whether the gym has to replay it.
  */
 
 export const runtime = "nodejs";
@@ -89,7 +101,8 @@ export async function POST(request: Request) {
       {
         ok: false,
         error: "rate_limited",
-        message: "Too many submissions. Please try again shortly, or call the gym.",
+        message:
+          "Too many submissions. Please try again shortly, or call the gym.",
       },
       {
         status: 429,
@@ -98,12 +111,17 @@ export async function POST(request: Request) {
     );
   }
 
-  // 3. Validate. The MGD API silently truncates and sanitises rather than
-  //    rejecting, so the honest validation has to happen here.
+  // 3. Validate. MyGymDesk silently truncates and sanitises rather than
+  //    rejecting, so honest validation has to happen here.
   const name = str(payload.name, MAX_LENGTHS.name);
   if (!name || name.length < 2) {
     return NextResponse.json(
-      { ok: false, error: "invalid_name", message: "Enter your full name." },
+      {
+        ok: false,
+        error: "invalid_name",
+        field: "name",
+        message: "Enter your full name.",
+      },
       { status: 400 },
     );
   }
@@ -114,6 +132,7 @@ export async function POST(request: Request) {
       {
         ok: false,
         error: "invalid_phone",
+        field: "phone",
         message: "Enter a valid 10-digit Indian mobile number.",
       },
       { status: 400 },
@@ -127,6 +146,7 @@ export async function POST(request: Request) {
       {
         ok: false,
         error: "invalid_email",
+        field: "email",
         message: "Enter a valid email address.",
       },
       { status: 400 },
@@ -160,79 +180,125 @@ export async function POST(request: Request) {
     whatsapp_opt_in: payload.whatsapp_opt_in !== false,
   };
 
-  // 5. Persist the mirror.
+  // 5. Mirror first.
   const supabase = getServiceSupabase();
-
-  if (!supabase) {
-    // The client's Supabase project isn't wired up yet. Fail loudly in the
-    // log, but do not tell the visitor their enquiry vanished — surface it as
-    // a real error so the form shows the "call us" fallback.
-    console.error(
-      "[enquiries] Supabase service role not configured — enquiry NOT stored:",
-      { name: record.name, phone: record.phone, source: record.source },
-    );
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "not_configured",
-        message:
-          "We couldn't submit that just now. Please call the gym and we'll take your details.",
-      },
-      { status: 503 },
-    );
-  }
-
-  // location_id is resolved server-side from the slug, so a forged id can't
-  // file a lead against the wrong branch. In seed-fallback mode the location
-  // has no database UUID, so only the slug snapshot is stored.
   const locationId =
     location && /^[0-9a-f-]{36}$/i.test(location.id) ? location.id : null;
 
-  const { data, error } = await supabase
-    .from("enquiries")
-    .insert({ ...record, location_id: locationId })
-    .select("id")
-    .single();
+  let mirrorId: string | null = null;
+  let mirrorError: string | null = null;
 
-  if (error) {
-    console.error("[enquiries] insert failed:", error.message);
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("enquiries")
+      .insert({ ...record, location_id: locationId })
+      .select("id")
+      .single();
+
+    if (error) {
+      mirrorError = error.message;
+      console.error("[enquiries] mirror insert failed:", error.message);
+    } else {
+      mirrorId = data.id as string;
+    }
+  } else {
+    mirrorError = "supabase service role not configured";
+    console.error(
+      "[enquiries] Supabase service role not configured — enquiry NOT mirrored:",
+      { name: record.name, source: record.source },
+    );
+  }
+
+  // 6. Forward to MyGymDesk.
+  let syncStatus: MgdSyncStatus = "pending";
+  let leadId: string | null = null;
+  let leadAction: "created" | "updated" | null = null;
+  let mgdLocationName: string | null = null;
+  let mgdErrorCode: string | null = null;
+  let forwardStatus = 0;
+
+  try {
+    const response = await mgd().captureLead({
+      name,
+      phone,
+      email: email ?? undefined,
+      interest: record.interest ?? undefined,
+      notes: record.message ?? undefined,
+      source: "website",
+      source_details: record.source_page ?? undefined,
+      city: location?.city,
+      // *(1.4)* File the lead on the branch the visitor actually chose.
+      // Our key is tenant-wide, so it may name any of the gym's branches.
+      location_id: location?.mgd_location_id ?? undefined,
+    });
+
+    syncStatus = "sent";
+    leadId = response.lead_id;
+    leadAction = response.action;
+    mgdLocationName = response.location_name;
+  } catch (error) {
+    syncStatus = "failed";
+    if (error instanceof MgdError) {
+      mgdErrorCode = error.code;
+      forwardStatus = error.status;
+      console.error(
+        `[enquiries] MGD forward failed: ${error.status} ${error.code} — ${error.message}`,
+      );
+    } else {
+      mgdErrorCode = "unknown";
+      console.error("[enquiries] MGD forward failed:", error);
+    }
+  }
+
+  // 7. Stamp the outcome onto the mirror so the admin list is honest.
+  if (supabase && mirrorId) {
+    const { error } = await supabase
+      .from("enquiries")
+      .update({
+        mgd_sync_status: syncStatus,
+        mgd_lead_id: leadId,
+        mgd_synced_at: syncStatus === "sent" ? new Date().toISOString() : null,
+        mgd_error:
+          syncStatus === "failed"
+            ? `${forwardStatus || ""} ${mgdErrorCode ?? ""}`.trim()
+            : null,
+      })
+      .eq("id", mirrorId);
+
+    if (error) {
+      console.error("[enquiries] status stamp failed:", error.message);
+    }
+  }
+
+  // 8. Answer the visitor.
+  //
+  // Success when EITHER system took it: a mirrored lead is a real lead the gym
+  // can work, and a lead in MyGymDesk is the system of record. Only a double
+  // failure is a genuine failure.
+  const captured = syncStatus === "sent" || mirrorId !== null;
+
+  if (!captured) {
     return NextResponse.json(
       {
         ok: false,
-        error: "storage_failed",
+        error: "capture_failed",
         message:
-          "We couldn't submit that just now. Please try again, or call the gym.",
+          "We couldn't submit that just now. Please call the gym and we'll take your details.",
+        detail: mirrorError,
       },
       { status: 502 },
     );
   }
 
-  // ── PHASE 2 ────────────────────────────────────────────────────────────
-  // Forward to MyGymDesk, then stamp the result back onto this row:
-  //
-  //   try {
-  //     const res = await mgd().captureLead({
-  //       name, phone, email: email ?? undefined,
-  //       interest: record.interest ?? undefined,
-  //       notes: record.message ?? undefined,
-  //       source: "website",
-  //       source_details: record.source_page ?? undefined,
-  //     });
-  //     await supabase.from("enquiries")
-  //       .update({ mgd_sync_status: "sent", mgd_lead_id: res.lead_id,
-  //                 mgd_synced_at: new Date().toISOString() })
-  //       .eq("id", data.id);
-  //   } catch (e) {
-  //     await supabase.from("enquiries")
-  //       .update({ mgd_sync_status: "failed",
-  //                 mgd_error: e instanceof MgdError ? e.code : String(e) })
-  //       .eq("id", data.id);
-  //     // Do NOT fail the request — the lead is safely mirrored and replayable.
-  //   }
-  //
-  // Note: MGD files leads against the ONE branch configured on the key. Adding
-  // per-request location_id is Track A item A5.
-  // ───────────────────────────────────────────────────────────────────────
-
-  return NextResponse.json({ ok: true, id: data.id });
+  // Surface the branch MyGymDesk actually filed against — it confirms the
+  // location_id took effect, and it is what the success screen quotes.
+  return NextResponse.json({
+    ok: true,
+    id: mirrorId,
+    lead_id: leadId,
+    action: leadAction,
+    location_name: mgdLocationName ?? location?.name ?? null,
+    // Tells the client the gym has it, even if our own mirror hiccuped.
+    synced: syncStatus === "sent",
+  });
 }

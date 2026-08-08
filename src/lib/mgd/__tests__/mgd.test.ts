@@ -206,9 +206,151 @@ describe("request shaping", () => {
   });
 });
 
-describe("phase 4-5 endpoints", () => {
+describe("website-products (v1.4)", () => {
+  it("caches the catalogue for 15 minutes, tagged", async () => {
+    const { api: client, calls } = api(() => ({
+      body: { products: [], currency: "INR", locationId: null, locationName: null },
+    }));
+    await client.getProducts();
+
+    expect(calls[0].url).toContain("website-products");
+    expect(calls[0].init.next?.revalidate).toBe(900);
+    expect(calls[0].init.next?.tags).toContain("mgd:products");
+  });
+
+  it("sends only the filters that were given", async () => {
+    const { api: client, calls } = api(() => ({ body: { products: [] } }));
+
+    await client.getProducts();
+    expect(calls[0].url).not.toContain("location_id");
+    expect(calls[0].url).not.toContain("in_stock_only");
+    expect(calls[0].url).not.toContain("category_id");
+
+    await client.getProducts({
+      locationId: "loc-1",
+      categoryId: "cat-1",
+      brand: "Optimum Nutrition",
+      inStockOnly: true,
+    });
+    expect(calls[1].url).toContain("location_id=loc-1");
+    expect(calls[1].url).toContain("category_id=cat-1");
+    expect(calls[1].url).toContain("brand=Optimum+Nutrition");
+    expect(calls[1].url).toContain("in_stock_only=true");
+  });
+
+  it("omits in_stock_only when false rather than sending false", async () => {
+    // `in_stock_only=false` is not a documented value; absence is the default.
+    const { api: client, calls } = api(() => ({ body: { products: [] } }));
+    await client.getProducts({ inStockOnly: false });
+    expect(calls[0].url).not.toContain("in_stock_only");
+  });
+
+  it("preserves the response envelope, not just the array", async () => {
+    const { api: client } = api(() => ({
+      body: {
+        products: [{ id: "p1", name: "Whey", stockStatus: "low_stock" }],
+        currency: "INR",
+        locationId: "loc-1",
+        locationName: "Test Branch",
+      },
+    }));
+
+    const res = await client.getProducts({ locationId: "loc-1" });
+    expect(res.locationName).toBe("Test Branch");
+    expect(res.currency).toBe("INR");
+    expect(res.products[0].stockStatus).toBe("low_stock");
+  });
+});
+
+describe("lead capture (v1.4 location_id)", () => {
+  it("sends location_id so the lead files on the visitor's branch", async () => {
+    const { api: client, calls } = api(() => ({ body: { success: true } }));
+
+    await client.captureLead({
+      name: "Asha Menon",
+      phone: "9876543210",
+      location_id: "297b62e2-8fcf-4983-b9fd-12d358bc414d",
+    });
+
+    const body = JSON.parse(calls[0].init.body as string);
+    expect(body.location_id).toBe("297b62e2-8fcf-4983-b9fd-12d358bc414d");
+  });
+
+  it("omits location_id entirely when the location has no MGD branch id", async () => {
+    // Absent means "the key's branch, else the gym's primary" — a documented
+    // fallback. Sending an empty string instead would be a 400.
+    const { api: client, calls } = api(() => ({ body: { success: true } }));
+
+    await client.captureLead({
+      name: "Asha Menon",
+      phone: "9876543210",
+      location_id: undefined,
+    });
+
+    const body = JSON.parse(calls[0].init.body as string);
+    expect(body).not.toHaveProperty("location_id");
+  });
+
+  it("surfaces location_out_of_scope distinctly", async () => {
+    const { api: client } = api(() => ({
+      status: 403,
+      body: { error: "location_out_of_scope", message: "…" },
+    }));
+
+    const err = await client
+      .captureLead({ name: "Asha Menon", phone: "9876543210" })
+      .catch((e) => e);
+
+    expect(err.code).toBe("location_out_of_scope");
+    expect(err.status).toBe(403);
+  });
+});
+
+describe("member pricing removal (v1.3)", () => {
+  it("never sends is_member for a service price check", async () => {
+    // `is_member` + booking_type=service is 422 member_pricing_unsupported.
+    const { api: client, calls } = api(() => ({ body: { valid: true } }));
+
+    await client.getSessionPrice({
+      sessionId: "s1",
+      bookingType: "service",
+      isMember: true,
+    });
+
+    expect(calls[0].url).not.toContain("is_member");
+  });
+
+  it("still sends is_member for a class, where it is an accepted no-op", async () => {
+    const { api: client, calls } = api(() => ({ body: { valid: true } }));
+
+    await client.getSessionPrice({
+      sessionId: "s1",
+      bookingType: "class",
+      isMember: true,
+    });
+
+    expect(calls[0].url).toContain("is_member=true");
+  });
+
+  it("strips is_member from a service booking order", async () => {
+    // This closed a money bug: the order used to be minted at the member rate
+    // while the booking charges the non-member rate, so the customer paid and
+    // was then refused with amount_mismatch.
+    const { api: client, calls } = api(() => ({ body: { order_id: "o" } }));
+
+    await client.createBookingOrder({
+      session_id: "s1",
+      booking_type: "service",
+      is_member: true,
+    });
+
+    const body = JSON.parse(calls[0].init.body as string);
+    expect(body).not.toHaveProperty("is_member");
+  });
+});
+
+describe("phase 5 endpoints still stubbed", () => {
   it.each([
-    ["getProducts", () => api().api.getProducts()],
     ["createShopOrder", () => api().api.createShopOrder({ items: [], location_id: "l", customer: { name: "A", phone: "p", email: "e" } })],
     ["createMembershipOrder", () => api().api.createMembershipOrder({ plan_id: "p", customer: { name: "A", phone: "p", email: "e" } })],
   ])("%s throws MgdNotYetLiveError instead of hitting a 404", async (_name, call) => {
@@ -217,7 +359,12 @@ describe("phase 4-5 endpoints", () => {
 
   it("does not issue a network request for a not-yet-live endpoint", async () => {
     const { api: client, calls } = api();
-    await client.getProducts().catch(() => {});
+    await client
+      .createMembershipOrder({
+        plan_id: "p",
+        customer: { name: "A", phone: "p", email: "e" },
+      })
+      .catch(() => {});
     expect(calls).toHaveLength(0);
   });
 });

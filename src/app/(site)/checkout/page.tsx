@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cookies } from "next/headers";
 
 import { CheckoutView } from "@/components/shop/CheckoutView";
 import { Container, Heading } from "@/components/ui/Primitives";
+import { getProducts } from "@/lib/content";
+import { LOCATION_STORAGE_KEY } from "@/lib/site";
+import { resolveLocation } from "@/lib/site-settings";
 
 export const metadata: Metadata = {
   title: "Checkout",
@@ -19,7 +23,15 @@ const STEPS = [
   { n: "4", label: "Done", done: false },
 ];
 
-export default function CheckoutPage() {
+export default async function CheckoutPage() {
+  // Live catalogue for the visitor's gym, so the cart's snapshot prices and
+  // stock notes are reconciled against reality rather than trusted.
+  const cookieStore = await cookies();
+  const location = await resolveLocation(
+    cookieStore.get(LOCATION_STORAGE_KEY)?.value,
+  );
+  const { data } = await getProducts(location);
+
   return (
     <>
       <section className="border-b border-line bg-surface">
@@ -69,7 +81,7 @@ export default function CheckoutPage() {
       </section>
 
       <Container className="pt-9">
-        <CheckoutView />
+        <CheckoutView products={data.products} />
       </Container>
     </>
   );

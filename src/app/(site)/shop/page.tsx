@@ -4,10 +4,11 @@ import { Suspense } from "react";
 
 import { ShopBrowser, ShopSkeleton } from "@/components/shop/ShopBrowser";
 import { PageHero } from "@/components/site/PageHero";
+import { ButtonLink } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Primitives";
 import { getProducts } from "@/lib/content";
-import { SHIPPING_FLAT_RATE } from "@/lib/fixtures/products";
 import { formatINR } from "@/lib/format";
+import { SHIPPING_FLAT_RATE } from "@/lib/shop";
 import { LOCATION_STORAGE_KEY } from "@/lib/site";
 import { resolveLocation } from "@/lib/site-settings";
 import type { SiteLocation } from "@/lib/supabase/types";
@@ -69,8 +70,29 @@ export default async function ShopPage() {
 }
 
 async function Catalog({ location }: { location: SiteLocation }) {
-  const { products } = await getProducts(location);
-  return <ShopBrowser products={products} />;
+  const { data, degraded } = await getProducts(location);
+
+  if (data.products.length === 0) {
+    return (
+      <div className="rounded-card border border-dashed border-line px-6 py-[60px] text-center">
+        <div className="mb-2.5 font-display text-[22px] font-semibold uppercase">
+          {degraded
+            ? "The shop is briefly unavailable"
+            : "Nothing in the shop just yet"}
+        </div>
+        <p className="mx-auto m-0 mb-5 max-w-[46ch] text-[14px] text-muted">
+          {degraded
+            ? "We couldn't reach the gym's stock system. Please try again shortly — the counter at the gym has everything in the meantime."
+            : `The ${location.short_name} counter stocks supplements, apparel and gear; it isn't listed online yet. Ask at the desk and we'll sort you out.`}
+        </p>
+        <ButtonLink href="/contact" variant="outline" size="sm">
+          Contact the gym
+        </ButtonLink>
+      </div>
+    );
+  }
+
+  return <ShopBrowser products={data.products} />;
 }
 
 function InfoCard({
