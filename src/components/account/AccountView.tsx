@@ -18,10 +18,15 @@ type Phase = "loading" | "signedOut" | "sending" | "codeSent" | "verifying" | "s
  * Sign In / My Orders.
  *
  * SCOPE NOTE: the SoW is explicit that the website does NOT do member
- * self-service — that is the MyGymDesk Member App's job. Customers sign in
- * here for ONE reason: to look at their shop orders. The Claude Design export
- * draws a fuller member dashboard (Overview / Bookings / Profile tabs); those
- * are deliberately not built. See HANDOFF.md.
+ * self-service — that is the Member App's job. Customers sign in here for ONE
+ * reason: to look at their shop orders. The Claude Design export draws a fuller
+ * member dashboard (Overview / Bookings / Profile tabs); those are deliberately
+ * not built. See HANDOFF.md.
+ *
+ * COPY RULE: visitor-facing text says "the Member App", never "MyGymDesk". The
+ * platform is the gym's supplier, not their customers' concern, and naming it
+ * on the gym's own site co-brands them with a vendor. Internal comments and the
+ * admin panel name it freely — staff do need to know where to go.
  *
  * Auth is Supabase email OTP rather than the password form the design draws,
  * because a password login means storing a credential for people who already
@@ -210,8 +215,8 @@ export function AccountView() {
             </div>
             <p className="m-0 text-[13px] leading-[1.6] text-muted">
               Bookings, renewals, freezes and membership invoices all live in
-              the MyGymDesk Member App — that is where your gym account is. This
-              sign-in is for shop orders only.
+              the Member App — that is where your gym account is. This sign-in
+              is for shop orders only.
             </p>
           </div>
 
