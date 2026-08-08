@@ -187,22 +187,67 @@ Worth stating plainly because it was live on production for roughly half an
 hour, and because it is a trap worth remembering: **a `loading.tsx` above a
 route that can 404 silently converts it into a soft 200.**
 
+### Result — before / after on production
+
+Environment variable fixed and password rotated by the client, then measured on
+`crunch-website-taupe.vercel.app`.
+
+**Server response (TTFB, median of 5 after warm-up):**
+
+| route | before | after |
+|---|---|---|
+| `/` | 7385 ms | **180 ms** |
+| `/about` | 7367 ms | **114 ms** |
+| `/classes` | 7381 ms | **180 ms** |
+| `/packages` | 7373 ms | **129 ms** |
+| `/shop` | 7416 ms | **186 ms** |
+| `/contact` | 7499 ms | **199 ms** |
+| `/policies/refund` | 7331 ms | **171 ms** |
+
+**Perceived paint on navigation** — click to first visual change in `main`,
+throttled to 150 ms latency / 1.6 Mbps:
+
+| route | before boundaries | after |
+|---|---|---|
+| `/classes` | 9 ms | 12 ms |
+| `/packages` | 7 ms | 8 ms |
+| `/shop` | 351 ms | **10 ms** |
+| `/contact` | 190 ms | **7 ms** |
+| `/about` | 416 ms | **5 ms** |
+| `/` (logo) | not measured | **9 ms** |
+
+Both bars met: TTFB 114–199 ms, perceived paint 5–12 ms.
+
+The second table is the one that matters for the original complaint ("visible
+delay per menu click"). The routes that were slow were exactly the ones without
+a loading boundary; the two that already had one were already instant. Content
+still settles at ~330–460 ms because these routes are dynamic — the layout reads
+cookies for theme and branch — so a click always costs one round trip. The
+boundary means the visitor never waits on it.
+
+**Correctness confirmed:** production is finally reading the client's database.
+Both real location UUIDs (`ed635d88…`, `e2d3fb4d…`) appear in the served HTML,
+where before it was rendering seed fallback.
+
+### One more self-inflicted failure worth recording
+
+Wiring `check:env` into the build failed the first production deploy — and it
+was my check's fault, not the environment's. Vercel injects its own
+`NEXT_PUBLIC_VERCEL_*` system variables, including
+`NEXT_PUBLIC_VERCEL_GIT_COMMIT_MESSAGE`, which is legitimately multi-line
+because it is the commit message. My new line-break rule flagged it.
+
+Fixed by skipping `NEXT_PUBLIC_VERCEL_*` — platform-injected variables are not
+ours to police. Verified three ways: passes with the system variables present,
+still fails on the corrupt anon key with both messages, and passes on the real
+environment.
+
 ### Still owed
 
-The production before/after table. "After" is meaningless until the env var is
-fixed, since every page is currently paying a 7-second failure. Once it is
-fixed, expect pages near the **~300 ms** floor already demonstrated on this
-deployment (`/api/...` route handler: 290 ms; database round trip: 283 ms).
-
-Non-regressions verified locally on the production build: dark theme present in
-the raw server HTML before any JS (no flash), location cookie resolves
-server-side, 0 px horizontal overflow at 360 and 1440 on all seven routes, and
-`check:env` / `check:locations` / `check:mgd-key` all pass.
-
-One item still to eyeball: the end-to-end admin save -> cache invalidation. The
-cache entry provably carries the `site-settings` tag that `updateTag` clears,
-but I could not drive the admin UI to completion (sign-in is emailed OTP).
-Worst case is bounded and self-healing: an edit takes up to 5 minutes to appear.
+The end-to-end admin save -> cache invalidation eyeball. The cache entry provably
+carries the `site-settings` tag that `updateTag` clears, but I could not drive
+the admin UI to completion (sign-in is emailed OTP). Worst case is bounded and
+self-healing: an edit takes up to 5 minutes to appear.
 
 ---
 
