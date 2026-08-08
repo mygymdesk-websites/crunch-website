@@ -4,10 +4,9 @@ import Link from "next/link";
 import { useEffect } from "react";
 
 import { useCart } from "@/components/providers/CartProvider";
-import { useLocation } from "@/components/providers/LocationProvider";
-import { StripedPlaceholder } from "@/components/ui/Primitives";
+import { CoverImage } from "@/components/ui/CoverImage";
 import { formatINR } from "@/lib/format";
-import { GST_RATE } from "@/lib/fixtures/products";
+import { GST_RATE } from "@/lib/shop";
 
 /**
  * The slide-in cart, per the Shop design: a 420px panel pinned to the right,
@@ -18,8 +17,7 @@ import { GST_RATE } from "@/lib/fixtures/products";
  * a client-computed total is never an input to a payment.
  */
 export function CartDrawer() {
-  const { isOpen, closeCart, resolve, setQty, remove } = useCart();
-  const { location } = useLocation();
+  const { isOpen, closeCart, lines, setQty, remove } = useCart();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -37,8 +35,10 @@ export function CartDrawer() {
 
   if (!isOpen) return null;
 
-  const lines = resolve(location.slug);
-  const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
+  const subtotal = lines.reduce(
+    (sum, line) => sum + line.snapshot.price * line.qty,
+    0,
+  );
   const gst = Math.round(subtotal * GST_RATE);
 
   return (
@@ -82,17 +82,18 @@ export function CartDrawer() {
             lines.map((line) => (
               <div key={line.productId} className="flex items-center gap-3">
                 <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg">
-                  <StripedPlaceholder
-                    label={line.product.name.toLowerCase()}
-                    className="!px-0"
+                  <CoverImage
+                    src={line.snapshot.imageUrl}
+                    alt={line.snapshot.name}
+                    placeholderLabel={line.snapshot.name.toLowerCase()}
                   />
                 </div>
                 <div className="min-w-0 flex-auto">
                   <div className="text-[13px] font-semibold leading-[1.35]">
-                    {line.product.name}
+                    {line.snapshot.name}
                   </div>
                   <div className="mt-0.5 text-[12px] text-muted">
-                    {line.product.variant}
+                    {line.snapshot.size ?? line.snapshot.brand ?? ""}
                   </div>
                   <div className="mt-1.5 flex items-center gap-2">
                     <QtyStepper
@@ -109,7 +110,7 @@ export function CartDrawer() {
                   </div>
                 </div>
                 <div className="shrink-0 text-[14px] font-bold">
-                  {formatINR(line.lineTotal)}
+                  {formatINR(line.snapshot.price * line.qty)}
                 </div>
               </div>
             ))

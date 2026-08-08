@@ -30,11 +30,16 @@ export function useEnquiry(source: EnquirySource) {
   const pathname = usePathname();
   const [phase, setPhase] = useState<EnquiryPhase>("idle");
   const [error, setError] = useState<string | null>(null);
+  /** Which field the error belongs to, so it can render inline. */
+  const [errorField, setErrorField] = useState<string | null>(null);
+  /** The branch MyGymDesk filed the lead against, for the success screen. */
+  const [filedAt, setFiledAt] = useState<string | null>(null);
 
   const submit = useCallback(
     async (input: EnquiryInput): Promise<boolean> => {
       setPhase("sending");
       setError(null);
+      setErrorField(null);
 
       try {
         const response = await fetch("/api/enquiries", {
@@ -57,17 +62,25 @@ export function useEnquiry(source: EnquirySource) {
         const body = (await response.json().catch(() => null)) as {
           ok?: boolean;
           message?: string;
+          field?: string;
+          location_name?: string | null;
         } | null;
 
         if (!response.ok || !body?.ok) {
-          setError(
-            body?.message ??
-              "We couldn't submit that just now. Please try again, or call the gym.",
-          );
+          // 429 gets the friendly retry line rather than the raw message.
+          const message =
+            response.status === 429
+              ? "We're getting a lot of enquiries right now. Please try again in a few minutes, or call the gym."
+              : (body?.message ??
+                "We couldn't submit that just now. Please try again, or call the gym.");
+
+          setError(message);
+          setErrorField(body?.field ?? null);
           setPhase("error");
           return false;
         }
 
+        setFiledAt(body.location_name ?? null);
         setPhase("done");
         return true;
       } catch {
@@ -84,9 +97,10 @@ export function useEnquiry(source: EnquirySource) {
   const reset = useCallback(() => {
     setPhase("idle");
     setError(null);
+    setErrorField(null);
   }, []);
 
-  return { phase, error, submit, reset };
+  return { phase, error, errorField, filedAt, submit, reset };
 }
 
 /**

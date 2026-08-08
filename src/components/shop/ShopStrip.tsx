@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 
+import { CoverImage } from "@/components/ui/CoverImage";
 import { Heading, Section } from "@/components/ui/Primitives";
-import { StripedPlaceholder } from "@/components/ui/Primitives";
 import { formatINR } from "@/lib/format";
-import { productSlugById } from "@/lib/fixtures/products";
 import type { MgdProduct } from "@/lib/mgd/types";
-import { stockState } from "./ProductCard";
+import { hasDiscount, productSlug, stockLabel, stockTone } from "@/lib/shop";
 
 /** "The counter, online" — the homepage's four-product shop teaser. */
 export function ShopStrip({ products }: { products: MgdProduct[] }) {
   const shown = products.slice(0, 4);
+  // The gym may not sell online yet, or may have nothing published. Dropping
+  // the whole band beats showing an empty shelf on the homepage.
   if (shown.length === 0) return null;
 
   return (
@@ -30,46 +31,53 @@ export function ShopStrip({ products }: { products: MgdProduct[] }) {
         </div>
 
         <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-4">
-          {shown.map((product) => {
-            const state = stockState(product.stock);
-            const slug = productSlugById(product.id);
-            return (
-              <Link
-                key={product.id}
-                href={slug ? `/shop/${slug}` : "/shop"}
-                className="overflow-hidden rounded-[12px] border border-line bg-surface transition-transform duration-300 hover:-translate-y-[3px]"
-              >
-                <div className="aspect-square overflow-hidden">
-                  <StripedPlaceholder
-                    label={`product shot — ${product.name.toLowerCase()}`}
-                  />
-                </div>
-                <div className="p-4">
-                  {product.brand ? (
-                    <div className="mb-[5px] text-[10px] font-bold uppercase tracking-[.12em] text-muted">
-                      {product.brand}
-                    </div>
-                  ) : null}
-                  <div className="mb-2.5 text-[14px] font-semibold leading-[1.35]">
-                    {product.name}
-                    {product.variant ? ` — ${product.variant}` : ""}
+          {shown.map((product) => (
+            <Link
+              key={product.id}
+              href={`/shop/${productSlug(product)}`}
+              className="overflow-hidden rounded-[12px] border border-line bg-surface transition-transform duration-300 hover:-translate-y-[3px]"
+            >
+              <div className="aspect-square overflow-hidden">
+                <CoverImage
+                  src={product.imageUrl}
+                  alt={product.name}
+                  placeholderLabel={`product shot — ${product.name.toLowerCase()}`}
+                />
+              </div>
+              <div className="p-4">
+                {product.brand ? (
+                  <div className="mb-[5px] text-[10px] font-bold uppercase tracking-[.12em] text-muted">
+                    {product.brand}
                   </div>
-                  <div className="flex items-center justify-between gap-2">
+                ) : null}
+                <div className="mb-2.5 text-[14px] font-semibold leading-[1.35]">
+                  {product.name}
+                  {product.size ? ` — ${product.size}` : ""}
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-baseline gap-1.5">
                     <span className="text-[15px] font-bold">
                       {formatINR(product.price)}
                     </span>
-                    <span
-                      className={`text-[11px] font-semibold ${
-                        state.tone === "accent" ? "text-accent" : "text-muted"
-                      }`}
-                    >
-                      {state.label}
-                    </span>
-                  </div>
+                    {hasDiscount(product) ? (
+                      <span className="text-[11px] text-muted line-through">
+                        {formatINR(product.mrp!)}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span
+                    className={`text-[11px] font-semibold ${
+                      stockTone(product.stockStatus) === "accent"
+                        ? "text-accent"
+                        : "text-muted"
+                    }`}
+                  >
+                    {stockLabel(product.stockStatus)}
+                  </span>
                 </div>
-              </Link>
-            );
-          })}
+              </div>
+            </Link>
+          ))}
         </div>
       </div>
     </Section>

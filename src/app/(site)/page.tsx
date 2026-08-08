@@ -14,7 +14,12 @@ import {
 } from "@/components/home/HomeSections";
 import { LocationPicker } from "@/components/home/LocationPicker";
 import { ShopStrip } from "@/components/shop/ShopStrip";
-import { getClassCatalog, getPlans, getProducts } from "@/lib/content";
+import {
+  getClassCatalog,
+  getPlans,
+  getProducts,
+  getPtPlans,
+} from "@/lib/content";
 import { LOCATION_STORAGE_KEY, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 import { getLocations, resolveLocation } from "@/lib/site-settings";
 
@@ -56,9 +61,12 @@ export default async function HomePage() {
 
   // Fetched on the server so the MGD key stays server-side and the page is
   // fully rendered for crawlers.
-  const [{ classes }, { plans }, { products }] = await Promise.all([
+  // getPlans and getPtPlans read the SAME cached `resource=plans` response,
+  // so asking for both costs one MyGymDesk request, not two.
+  const [classes, plans, ptPlans, products] = await Promise.all([
     getClassCatalog(location),
     getPlans(location),
+    getPtPlans(location),
     getProducts(location),
   ]);
 
@@ -66,11 +74,11 @@ export default async function HomePage() {
     <>
       <Hero />
       <LocationPicker />
-      <HomeClasses classes={classes} />
+      <HomeClasses classes={classes.data} />
       <HomeTrainers />
       <HomeWhyUs />
-      <HomePackages plans={plans} />
-      <ShopStrip products={products} />
+      <HomePackages plans={plans.data} ptPlans={ptPlans.data} />
+      <ShopStrip products={products.data.products} />
       <HomeTestimonials />
       <HomeSocial />
       <HomeTrialBand />

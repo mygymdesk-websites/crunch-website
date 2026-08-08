@@ -1,3 +1,326 @@
+# Handoff
+
+> ## Phase 2 — Live Display + Leads · BUILT, with two things outstanding
+> Leads are **live and verified end-to-end on both branches.** Display is wired
+> to the live API but has **nothing to show yet** — the gym has published no
+> plans, classes, sessions or products. Two blockers remain, both needing you:
+> a DDL credential for the client's Supabase, and the Cloudflare proxy.
+> Details in [§0](#0-phase-2-report-080826).
+
+---
+
+## 0. Phase 2 report (08/08/26)
+
+### Gate re-check — cleared, except the database
+
+| Gate item | State |
+|---|---|
+| `MGD_API_KEY` present | ✅ 41 chars, correct format |
+| Key generated + active | ✅ active, 300/hr, tenant-wide (spans both branches) |
+| `website-products` deployed | ✅ v1, 08/08 11:28 — Track A A1 shipped |
+| Lead `location_id` param | ✅ `capture-website-lead` v113 — Track A A5 shipped |
+| API doc v1.4 | ✅ on `origin/main` (my checkout was stale) |
+| Supabase credentials present | ✅ all three |
+| **Supabase schema applied** | ❌ **blocked — no DDL credential** |
+| **Supabase URL proxied** | ❌ **raw `*.supabase.co` — GO-LIVE BLOCKER** |
+
+### 🔴 Blocker 1 — the client's Supabase schema is not applied
+
+The project (`bjwcsvpqplsgwkbbvehx`) is empty: none of the six tables or the
+public view exist. `.env.local` has the service-role key, which grants
+PostgREST access but **not DDL** — and the project is in the client's own
+Supabase account, not one I can reach.
+
+**One of these unblocks it:**
+
+1. **You run it** — paste `supabase/migrations/*.sql` (in filename order) then
+   `supabase/seed.sql` into the project's SQL Editor. Fastest.
+2. **A Supabase personal access token** for the client's account in
+   `.env.local` as `SUPABASE_ACCESS_TOKEN` — I can then apply it via the
+   Management API.
+3. **The database password** — I can then `supabase db push`.
+
+Until then: the site runs on the checked-in location seed (which is why every
+page still renders), and **enquiry mirroring is off** — leads reach MyGymDesk
+but nothing is written locally, so the admin Enquiries list stays empty. The
+code path is built and verified; it starts working the moment the tables exist.
+
+### 🔴 Blocker 2 — Supabase URL is a raw `*.supabase.co` host
+
+`NEXT_PUBLIC_SUPABASE_URL` points at `bjwcsvpqplsgwkbbvehx.supabase.co`.
+`npm run check:env` refused it, and I proceeded on the documented local-dev
+escape hatch (`ALLOW_RAW_SUPABASE_URL=true` in `.env.local`, which the check
+ignores for production builds).
+
+**This must not reach production.** Raw Supabase domains are ISP-blocked in
+parts of India, and this URL runs in the visitor's browser — sign-in, the admin
+panel and My Orders would silently fail for real customers. Point
+`db.crunchfitness.in` (or similar) at the project through Cloudflare and swap
+the URL.
+
+### ⚠️ The gym has published nothing
+
+Live-verified, at the API, just now — every endpoint answers `200` with an
+empty list:
+
+| Endpoint | Live result |
+|---|---|
+| `website-services?resource=plans` | `{"plans":[]}` — 4 plans exist, **0 published to self-serve** |
+| `website-classes?resource=catalog` | `{"classes":[]}` — 0 class types |
+| `website-classes?resource=sessions` | `{"sessions":[]}` — 0 scheduled |
+| `website-services?resource=catalog` | `{"services":[]}` |
+| `website-products` | `{"products":[],"currency":"INR",…}` — 0 published |
+
+So **"live data renders" could not be demonstrated** — what I verified instead
+is that every surface renders its designed empty state, correctly named per
+branch, with no crash or blank. The moment the owner publishes, the pages fill
+in with no code change.
+
+To publish: membership plans need **Publish to self-serve** switching on
+(Settings → the plan → publish), classes need types + a schedule, and shop
+products need publishing to the website.
+
+**Worth checking before publishing:** the four plans are Monthly ₹4,500 ·
+Quarterly ₹10,000 · **Half Yearly ₹150,000** · Yearly ₹21,000. Half Yearly
+being seven times Yearly looks like a slip for ₹15,000.
+
+### ✅ Verified working
+
+**Leads — live, both branches, confirmed at the database.** Two test leads
+submitted through the site's own endpoint:
+
+| Branch picked | MGD `lead_id` | `location_name` echoed back |
+|---|---|---|
+| Vasant Kunj | `4b0229fb-f13a-486f-8cc8-18d79cf10730` | Crunch Fitness — Vasant Kunj |
+| Gurgaon | `c6c2bc88-0c2d-43ad-88c8-9355706627cb` | Crunch Fitness — Gurgaon |
+
+Both confirmed in MyGymDesk's `leads` table on the correct `location_id`, with
+`status: new`, `source: website`. **These are test rows named
+"ZZ WEBSITE TEST - DELETE ME (VK/GG)" — please delete them from Leads →
+Enquiries.** I left them rather than deleting from a live CRM myself; say the
+word and I will.
+
+**Caching — 10 rapid page loads consumed 0 API requests.** Measured against the
+key's own `requests_this_hour` counter: it read 3 before and 3 after. Across
+the whole verification run, 22 page loads cost 3 API calls. The shared hourly
+budget is safe from public traffic.
+
+**Failure injection — every surface degrades honestly.** Ran the built server
+with a deliberately invalid key: all pages still returned `200`, each showed
+its "briefly unavailable" state naming the real reason, and the server log
+carried `[content] plans failed: 401 unauthorized` etc. No crash, no blank, no
+stale-looking fake data.
+
+**Regression:** build clean · 26/26 tests (up from 17) · 0 lint findings ·
+`check:locations` green · **0px horizontal overflow across 11 routes at 360px
+and 1440px** (22 measurements).
+
+### Two defects live data exposed, both fixed
+
+1. **A fabricated price.** The homepage read "Personal training from ₹800 a
+   session" — a Phase 1 placeholder that became a false claim about a real
+   gym's pricing the moment the site went live. It is now derived from the
+   cheapest priced service package, and omitted entirely when none exists.
+2. **Headings above nothing.** With an empty catalogue the homepage rendered
+   "On the schedule at Vasant Kunj" and the Memberships band above empty grids.
+   Both sections now hide when there is nothing to show — the Classes and
+   Packages pages carry the explanatory empty states, which is where someone
+   who went looking will be.
+
+### API-shape notes for Track A
+
+Reported as asked. Nothing here is a bug — these are places the contract and my
+Phase 1 assumptions diverged, plus one caveat:
+
+- **⚠️ The v1.4 shapes are implemented FROM THE DOC, not verified against live
+  payloads.** Every endpoint returned an empty list, so `MgdProduct`,
+  `stockByLocation`, per-row `currency` and the rest are untested against real
+  data. First publish is the real test. This is the single biggest risk
+  carried into Phase 3.
+- `website-products` returns `category` as an **object** (`{id, name}`), not a
+  string. My Phase 1 stub assumed a string; corrected.
+- The products response carries `currency` / `locationId` / `locationName` at
+  the **envelope** level as well as per row. Confirmed live: filtering by
+  `location_id` echoes it back correctly
+  (`locationName: "Crunch Fitness — Vasant Kunj"`).
+- `mrp` is **omitted**, not null, when absent — presence must never be
+  asserted. Handled via a `hasDiscount()` guard.
+- `sport` is `""` when unset while services' `category` is `null`. The
+  asymmetry is documented in 1.3 and now encoded in the types.
+- `intervalLabel` can be the empty string; the pricing cards render the price
+  alone rather than an empty suffix.
+- **v1.3 removed member pricing**, and `is_member` + `booking_type=service` is
+  now `422`. The client strips `is_member` for services rather than forwarding
+  it — this closed a money bug where the order was minted at the member rate
+  and the booking then failed on `amount_mismatch` after the customer had paid.
+- MyGymDesk names the branches with an em dash ("Crunch Fitness — Vasant Kunj")
+  while the website seed uses a comma. No conflict — the UUID is the join key —
+  but the two will differ wherever MGD's own name is echoed, as in the lead
+  confirmation.
+
+### Design decisions this phase
+
+**DECISION 15 — `mgd_location_id` is now exposed on the public location view.**
+Phase 1 withheld it as "internal wiring". That was wrong on both counts: every
+display call is filtered by it and made through the same anonymous read path,
+so hiding it would have meant a service-role client on every public page render
+— a far bigger exposure than an opaque branch UUID that grants nothing without
+the API key. Migration `20260808100000_expose_mgd_location_id.sql`.
+
+**DECISION 16 — the cart stores a snapshot, not a live product reference.**
+Product data now comes from MyGymDesk, which only the server may call, and the
+cart drawer renders on every page. Snapshotting name/price/size at add-time
+avoids fetching the whole catalogue on every page view. Prices are display-only
+and Phase 5 re-resolves every one server-side, so a stale snapshot can never
+become the amount charged. Checkout reconciles against the live catalogue for
+stock.
+
+**DECISION 17 — product URLs are `name-size-<8 hex of id>`.** MyGymDesk has no
+slug field and no variant engine (a size run is separate products), so name
+alone is not unique. This is readable and collision-proof without scanning the
+catalogue.
+
+**DECISION 18 — PT packages are the `interval: "custom"` rows of
+`resource=plans`.** This resolves the Phase 1 DECISION 6 question. Membership
+plans bill on a calendar period; service packages are one-off blocks. If the
+gym models PT as PT *plans* rather than service packages, the endpoint excludes
+them and the section stays hidden — deliberately, with no fixture fallback.
+
+**DECISION 19 — an enquiry succeeds if EITHER system took it.** The local
+mirror is written first, then the MGD forward, then the outcome is stamped
+back. A forwarding failure does not fail the request when the mirror is safe —
+the enquiry genuinely was received — and vice versa. Only a double failure
+returns an error. `mgd_sync_status` in the admin list is the queue of leads
+that still need replaying; `Failed` renders as "Not in MGD" because that row is
+then the only copy.
+
+### Still owed
+
+- Trainer photos: not provided, placeholders still render. Drop four JPGs into
+  `public/images/trainers/` (`rahul-bisht`, `king-nash`, `harry-singh`,
+  `abhishek-guha`) and they appear with no code change.
+- `SHIPROCKET_EMAIL` / `SHIPROCKET_PASSWORD` still empty — Phase 5.
+- Policy copy still placeholder and not legally reviewed (Phase 1 gap, unchanged).
+- Allowed Origins on the MGD key is empty. Correct while the site calls the API
+  server-side only, which it does. It must be set before anything calls MGD
+  from the browser.
+
+---
+
+## 0. Phase 2 gate report (08/08/26)
+
+Ran the gate before touching any code. **Result: stop.** Evidence below — all of
+it read-only, from the MyGymDesk database and the deployed function list.
+
+### Blockers
+
+**B1 — No credentials at all.** There is no `.env.local` in the repo. Neither
+`MGD_API_KEY` nor any of the three Supabase variables is present, so the
+migrations cannot be applied and the API cannot be called.
+
+**B2 — The MyGymDesk API key has never been generated.** ⚠️ This is the one that
+needs action, not just a paste. `tenant_website_api_keys` has **zero rows** for
+the Crunch tenant (`af70dabd-bd5a-4734-aaeb-3548112ae1a9`). The Phase 0
+dependency "API key generated + toggle ON + allowed origins set + rate limit
+raised" has not been done. The owner must, in the MyGymDesk dashboard:
+
+1. **Settings → Growth & Apps → Integrations → Website Lead Capture** (Pro plan —
+   the tenant is on `pro`, so this screen is available).
+2. Copy the key **immediately** — it is shown once and stored only as a hash.
+3. **Toggle it ON.** New keys start inactive; every request 403s until it is on.
+4. Allowed Origins — full origins *with scheme*, comma-separated:
+   `https://crunchfitness.in, https://www.crunchfitness.in`
+5. Raise Rate Limit from 30/hr to **300/hr** (it is one shared budget across all
+   endpoints, not 30 each).
+
+**B3 — `website-products` is not deployed.** The Phase 2 brief specifies the shop
+grid and product detail read `GET /website-products` with `stockStatus`, `mrp`
+and `?in_stock_only`. That endpoint does not exist on the platform — Track A
+item **A1 has not shipped**. Deployed website-* functions are: `website-services`,
+`website-classes`, `website-session-price`, `website-booking-order`,
+`website-class-booking`, `website-service-booking`, `capture-website-lead`.
+Absent: `website-products`, `website-shop-order`, `website-membership-order`,
+`website-membership-purchase`.
+
+**B4 — `capture-website-lead` has no per-request `location_id`.** The brief
+specifies submitting "with the v1.4 `location_id` param (the user's selected
+location)". The deployed function (v111, updated 06/08/26) files every lead
+against the branch configured on the key:
+
+```ts
+location_id: keyRecord.location_id || null,
+```
+
+There is no request-body override. Track A item **A5 has not shipped**. Until it
+does, all website leads land on ONE branch regardless of what the visitor picked
+— they would have to be re-assigned by hand in the dashboard.
+
+**B5 — There is no API doc v1.4.** `docs/website-api-integration.md` in
+`mygymdesk-fresh` is still **v1.1 (2026-07-20)**. It contains no mention of
+`website-products`, `stockStatus`, or a v1.2/1.3/1.4 changelog. The response
+shapes the brief describes have no published contract to build against.
+
+### Client-config gaps (independent of the above)
+
+Even once B1–B5 clear, the tenant has almost nothing to display. Counts from the
+live MyGymDesk database:
+
+| Content | State | Effect on the site |
+|---|---|---|
+| `membership_plans` | 4 active, **0 published to self-serve** | `resource=plans` returns empty → Packages shows its empty state |
+| `class_types` | **0** | Classes catalog empty |
+| `class_sessions` | **0** | Weekly timetable empty at both branches |
+| `products` | **0** | Shop empty even after A1 ships |
+| `service_packages` | **0** | PT section hides (per brief, correctly) |
+
+The four plans that exist (Monthly ₹4,500 · Quarterly ₹10,000 · Half Yearly
+₹150,000 · Yearly ₹21,000) all have `is_published_self_serve = false`. Note
+**Half Yearly at ₹150,000** looks like a data-entry slip for ₹15,000 — worth
+checking before it is published. These prices also differ from the design's
+placeholder pricing (₹2,500 / ₹6,500 / ₹24,000), which is expected — live data
+wins — but the client should confirm the live figures are the ones to show.
+
+### Recovered and ready (no guessing needed once unblocked)
+
+| Thing | Value |
+|---|---|
+| Crunch tenant id | `af70dabd-bd5a-4734-aaeb-3548112ae1a9` (pro, active, approved) |
+| Vasant Kunj `mgd_location_id` | `c53f2dc1-8889-46d7-8589-2f4c40119840` |
+| Gurgaon `mgd_location_id` | `297b62e2-8fcf-4983-b9fd-12d358bc414d` |
+| Old Gurgaon tenant | `bfaa0774-…` — **suspended**, merge looks correct |
+
+MyGymDesk names the branches "Crunch Fitness — Vasant Kunj" (em dash); the
+website seed uses "Crunch Fitness, Vasant Kunj" (comma). No conflict — the join
+key is the UUID and the website name is display copy — but worth knowing they
+differ.
+
+### What was built while blocked
+
+Only the guardrail the brief asked for as permanent tooling, because it needs to
+exist *before* a URL is pasted, and it involves no guessing:
+
+- **`npm run check:env`** (`scripts/check-env.mjs`), wired into `npm run verify`.
+  Fails the build on a raw `*.supabase.co` URL, with `ALLOW_RAW_SUPABASE_URL=true`
+  as a local-dev-only escape hatch that is ignored for production builds. Also
+  fails on any server secret behind a `NEXT_PUBLIC_*` name, and on an
+  `mgd_live_…` or service-role value pasted into a public variable.
+  Verified across six cases: no-env, raw URL, raw URL + opt-out, raw URL +
+  production, proxied domain, and a leaked key.
+- `.env.example` documents the new vars, the key's once-only nature, and the
+  proxied-domain requirement.
+
+**Nothing else was touched.** `src/lib/content.ts` still returns fixtures, no
+migrations were applied, and no MGD wiring was written.
+
+### GO-LIVE BLOCKER
+
+If the Cloudflare proxy for the client's Supabase project is not ready and local
+dev proceeds on a raw `*.supabase.co` URL via `ALLOW_RAW_SUPABASE_URL=true`,
+**that must not reach production.** `check:env` enforces it on production builds,
+but the proxy still has to be set up before launch.
+
+---
+
 # Phase 1 — Foundations · Handoff
 
 **Repo:** `crunch-website` · **Branch:** `main` · **Date:** 08/08/2026

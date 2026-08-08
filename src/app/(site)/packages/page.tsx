@@ -135,17 +135,20 @@ export default async function PackagesPage() {
 }
 
 async function MembershipPlans({ location }: { location: SiteLocation }) {
-  const { plans } = await getPlans(location);
+  const { data: plans, degraded } = await getPlans(location);
 
   if (plans.length === 0) {
     return (
       <div className="rounded-[16px] border border-dashed border-line px-6 py-[60px] text-center">
         <div className="mb-2.5 font-display text-[22px] font-semibold uppercase">
-          No plans published for this location yet
+          {degraded
+            ? "Pricing is briefly unavailable"
+            : "No plans published for this location yet"}
         </div>
         <p className="mx-auto m-0 max-w-[46ch] text-[14px] text-muted">
-          Membership pricing for {location.short_name} is being set up. Call the
-          gym on {location.phone} and we&rsquo;ll quote you directly.
+          {degraded
+            ? "We couldn't reach the gym's system just now. Please try again shortly, or call the desk and we'll quote you directly."
+            : `Membership pricing for ${location.short_name} is being set up. Call the gym and we'll quote you directly.`}
         </p>
       </div>
     );
@@ -155,7 +158,10 @@ async function MembershipPlans({ location }: { location: SiteLocation }) {
 }
 
 async function PtPlans({ location }: { location: SiteLocation }) {
-  const { plans } = await getPtPlans(location);
+  const { data: plans } = await getPtPlans(location);
+  // The section hides entirely when the gym has no service packages — no
+  // fixture fallback, because inventing a PT price list on a live gym's site
+  // is worse than showing nothing.
   if (plans.length === 0) return null;
   return <PlanGrid plans={plans} kind="pt" />;
 }

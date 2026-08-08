@@ -80,14 +80,18 @@ export interface SiteLocation {
   latitude: number | null;
   longitude: number | null;
   socials: LocationSocials;
+  /**
+   * The MyGymDesk branch UUID this location maps to. Null until configured —
+   * readers then fall back to an UNFILTERED API call rather than guessing.
+   */
+  mgd_location_id: string | null;
   is_default: boolean;
   display_order: number;
   hero_image_url: string | null;
 }
 
-/** The full row, including internal wiring. Admin surfaces only. */
+/** The full row, including presentation state. Admin surfaces only. */
 export interface SiteLocationAdmin extends SiteLocation {
-  mgd_location_id: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

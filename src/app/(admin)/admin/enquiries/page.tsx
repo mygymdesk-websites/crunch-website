@@ -15,9 +15,10 @@ const PAGE_SIZE = 100;
  * the CRM. This list exists so the client can see what the website captured
  * without an MGD login, and so nothing is lost if the MGD forward fails.
  *
- * `mgd_sync_status` is shown from day one: in Phase 1 everything reads
- * "Pending", and once the forward is wired it becomes the queue of leads that
- * still need replaying.
+ * `mgd_sync_status` is the important column: `Sent` means MyGymDesk has it and
+ * the sales team will see it in the CRM; `Failed` means this row is the ONLY
+ * copy and someone has to re-enter it. `mgd_error` carries the status and code
+ * so a pattern (a 429 burst, an expired key) is visible at a glance.
  */
 export default async function AdminEnquiriesPage() {
   const gate = await getAdminGate();
@@ -161,8 +162,10 @@ export default async function AdminEnquiriesPage() {
 function SyncBadge({ status }: { status: Enquiry["mgd_sync_status"] }) {
   const map = {
     sent: { tone: "accent" as const, label: "Sent" },
+    // Pending means the forward has not been attempted — replayable.
     pending: { tone: "muted" as const, label: "Pending" },
-    failed: { tone: "dark" as const, label: "Failed" },
+    // Failed means THIS ROW IS THE ONLY COPY. Loudest treatment available.
+    failed: { tone: "dark" as const, label: "Not in MGD" },
     skipped: { tone: "muted" as const, label: "Skipped" },
   };
   const { tone, label } = map[status];

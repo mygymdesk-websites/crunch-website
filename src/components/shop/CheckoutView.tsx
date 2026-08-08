@@ -8,11 +8,12 @@ import { useLocation } from "@/components/providers/LocationProvider";
 import { QtyStepper } from "@/components/shop/CartDrawer";
 import { ButtonLink } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Field";
-import { StripedPlaceholder } from "@/components/ui/Primitives";
-import { GST_RATE, SHIPPING_FLAT_RATE } from "@/lib/fixtures/products";
+import { CoverImage } from "@/components/ui/CoverImage";
 import { INDIAN_STATES } from "@/lib/fixtures/site-content";
 import { formatINR } from "@/lib/format";
 import { formatAddress } from "@/lib/location-format";
+import type { MgdProduct } from "@/lib/mgd/types";
+import { GST_RATE, SHIPPING_FLAT_RATE, stockLabel } from "@/lib/shop";
 
 type Fulfilment = "pickup" | "courier";
 
@@ -32,13 +33,16 @@ type Fulfilment = "pickup" | "courier";
  * price, stock and GST from MyGymDesk; a client-computed figure is never an
  * input to a payment.
  */
-export function CheckoutView() {
+export function CheckoutView({ products }: { products: MgdProduct[] }) {
   const { location } = useLocation();
-  const { resolve, setQty, remove, hydrated } = useCart();
+  const { lines, setQty, remove, hydrated } = useCart();
   const [fulfilment, setFulfilment] = useState<Fulfilment>("pickup");
   const fieldId = useId();
 
-  const lines = resolve(location.slug);
+  // Live stock for the selected branch, supplied by the server. The cart holds
+  // a snapshot (it renders on every page and cannot call MyGymDesk), so stock
+  // is reconciled here against the real catalogue rather than trusted from it.
+  const liveById = new Map(products.map((p) => [p.id, p]));
 
   if (!hydrated) {
     return (
@@ -67,7 +71,10 @@ export function CheckoutView() {
 
   const isShip = fulfilment === "courier";
   const count = lines.reduce((sum, line) => sum + line.qty, 0);
-  const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
+  const subtotal = lines.reduce(
+    (sum, line) => sum + line.snapshot.price * line.qty,
+    0,
+  );
   const shipping = isShip ? SHIPPING_FLAT_RATE : 0;
   const taxable = subtotal + shipping;
   const gst = Math.round(taxable * GST_RATE);
@@ -90,15 +97,16 @@ export function CheckoutView() {
           </div>
 
           {lines.map((line) => {
-            const over = line.qty > line.stock;
-            const note =
-              line.stock === 0
+            const live = liveById.get(line.productId);
+            // Exact quantities are never exposed by the API, so the note can
+            // only ever be the tri-state status — no "only N left".
+            const note = !live
+              ? "No longer available"
+              : live.stockStatus === "out_of_stock"
                 ? `Out of stock at ${location.short_name}`
-                : over
-                  ? `Only ${line.stock} in stock — quantity will be adjusted`
-                  : line.stock <= 3
-                    ? `Only ${line.stock} left`
-                    : "In stock";
+                : stockLabel(live.stockStatus);
+            const flagged =
+              !live || live.stockStatus !== "in_stock";
 
             return (
               <div
@@ -106,27 +114,29 @@ export function CheckoutView() {
                 className="flex flex-wrap items-center gap-4 border-b border-line px-[22px] py-[18px] last:border-b-0"
               >
                 <span className="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-[10px]">
-                  <StripedPlaceholder
-                    label={line.product.name.toLowerCase()}
-                    className="!px-0"
+                  <CoverImage
+                    src={line.snapshot.imageUrl}
+                    alt={line.snapshot.name}
+                    placeholderLabel={line.snapshot.name.toLowerCase()}
                   />
                 </span>
 
                 <span className="min-w-0 flex-[1_1_180px]">
-                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-[.12em] text-muted">
-                    {line.product.brand}
-                  </span>
+                  {line.snapshot.brand ? (
+                    <span className="mb-1 block text-[10px] font-bold uppercase tracking-[.12em] text-muted">
+                      {line.snapshot.brand}
+                    </span>
+                  ) : null}
                   <span className="block text-[15px] font-semibold leading-[1.35]">
-                    {line.product.name}
+                    {line.snapshot.name}
                   </span>
                   <span className="mt-[3px] block text-[12px] text-muted">
-                    {line.product.variant} · {formatINR(line.unitPrice)} each
+                    {line.snapshot.size ? `${line.snapshot.size} · ` : ""}
+                    {formatINR(line.snapshot.price)} each
                   </span>
                   <span
                     className={`mt-[5px] block text-[11px] font-semibold ${
-                      line.stock === 0 || over || line.stock <= 3
-                        ? "text-accent"
-                        : "text-muted"
+                      flagged ? "text-accent" : "text-muted"
                     }`}
                   >
                     {note}
@@ -140,7 +150,7 @@ export function CheckoutView() {
 
                 <span className="min-w-[88px] shrink-0 text-right">
                   <span className="block text-[16px] font-bold">
-                    {formatINR(line.lineTotal)}
+                    {formatINR(line.snapshot.price * line.qty)}
                   </span>
                   <button
                     type="button"

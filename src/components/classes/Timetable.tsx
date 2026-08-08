@@ -41,9 +41,12 @@ interface DayColumn {
 export function Timetable({
   sessions,
   locationShortName,
+  degraded = false,
 }: {
   sessions: MgdClassSession[];
   locationShortName: string;
+  /** True when the API call failed, as opposed to returning nothing. */
+  degraded?: boolean;
 }) {
   const { openTrial } = useTrialModal();
   const [activeIndex, setActiveIndex] = useState(0);
@@ -82,18 +85,21 @@ export function Timetable({
     (s) => typeFilter === "All" || (s.sport ?? "Class") === typeFilter,
   );
 
-  // The whole location has no published schedule — a real state on a branch
-  // that has been created in MyGymDesk but not scheduled yet.
+  // Two different empty states. "Nothing scheduled" is a real state on a
+  // branch created in MyGymDesk but not yet timetabled; "we couldn't reach it"
+  // is our problem and should not be dressed up as the gym's.
   if (sessions.length === 0) {
     return (
       <div className="rounded-card border border-dashed border-line px-6 py-[60px] text-center">
         <div className="mb-2.5 font-display text-[22px] font-semibold uppercase">
-          No classes scheduled at this location yet
+          {degraded
+            ? "The timetable is briefly unavailable"
+            : "No classes scheduled at this location yet"}
         </div>
         <p className="mx-auto m-0 mb-5 max-w-[46ch] text-[14px] text-muted">
-          The {locationShortName} timetable goes live once the studio schedule
-          is published. Ask the front desk, or book a free trial and we&rsquo;ll
-          call you when it opens.
+          {degraded
+            ? "We couldn't reach the gym's scheduling system. Please try again shortly, or call the desk — the classes are still running."
+            : `The ${locationShortName} timetable goes live once the studio schedule is published. Ask the front desk, or book a free trial and we'll call you when it opens.`}
         </p>
         <Button size="sm" onClick={() => openTrial()}>
           Book Free Trial

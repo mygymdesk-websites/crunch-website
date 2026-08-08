@@ -18,8 +18,8 @@ npm run dev                    # http://localhost:3000
 ```
 
 With no credentials the site still builds and renders: locations fall back to
-the checked-in seed, and gym data comes from typed fixtures shaped exactly like
-the MyGymDesk API responses.
+the checked-in seed, and every MyGymDesk read degrades to an empty result so
+each page shows its designed empty state rather than crashing.
 
 ## Scripts
 
@@ -33,6 +33,7 @@ the MyGymDesk API responses.
 | `npm run seed:generate` | Regenerate `supabase/seed.sql` from the location seed |
 | `npm run check:locations` | Fail if a location name leaked into code |
 | `npm run check:mgd-key` | Fail if the MGD key could reach the browser |
+| `npm run check:env` | Fail on a raw `*.supabase.co` URL, or a secret in a `NEXT_PUBLIC_` var |
 | `npm run verify` | All of the above, in order |
 
 ## How it is put together
@@ -47,8 +48,7 @@ src/
   lib/
     mgd/             typed MyGymDesk Website API client (server-only)
     supabase/        browser / server / service-role clients
-    fixtures/        placeholder data, shaped like the real API responses
-    content.ts       ← the Phase 2 swap point: fixtures today, MGD tomorrow
+    content.ts       ← the data source: LIVE MyGymDesk API (v1.4) since Phase 2
     site-settings.ts location registry (server-only)
 supabase/
   migrations/        schema, RLS + explicit GRANTs

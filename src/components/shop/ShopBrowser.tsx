@@ -5,27 +5,34 @@ import { useId, useMemo, useState } from "react";
 import { useLocation } from "@/components/providers/LocationProvider";
 import { Button } from "@/components/ui/Button";
 import { SkeletonBlock } from "@/components/ui/Primitives";
-import {
-  PRICE_BANDS,
-  PRODUCT_BRANDS,
-  PRODUCT_CATEGORIES,
-  PRODUCT_SIZES,
-  PRODUCT_FIXTURES,
-  SHIPPING_FLAT_RATE,
-} from "@/lib/fixtures/products";
 import { formatINR } from "@/lib/format";
 import type { MgdProduct } from "@/lib/mgd/types";
+import {
+  PRICE_BANDS,
+  SHIPPING_FLAT_RATE,
+  brandsFrom,
+  categoriesFrom,
+  isOutOfStock,
+  sizesFrom,
+} from "@/lib/shop";
 import { ProductCard } from "./ProductCard";
 
 type Sort = "featured" | "low" | "high" | "name";
 
+const ALL = "All";
+
 /**
- * The shop grid with its filter rail.
+ * The shop grid and its filter rail.
  *
- * Filtering, sorting and search all run client-side over the location's
- * catalog. That is deliberate: the MyGymDesk products endpoint has no
- * pagination, filtering or search ("No pagination, no filtering beyond
- * ?location_id=, no search"), so the work has to happen here regardless.
+ * Filters are derived from the CATALOGUE THAT CAME BACK, not from a hardcoded
+ * list — a new brand or category in MyGymDesk gets its own chip with no code
+ * change, and a filter never offers a value that would return nothing.
+ *
+ * Filtering runs client-side because the API has no pagination or search
+ * ("No pagination, no filtering beyond the documented params, no search"), so
+ * the whole location catalogue arrives in one cached call regardless.
+ * `in_stock_only` is applied here too, matching the API's own rule: it drops
+ * only `out_of_stock`, leaving `low_stock` visible.
  */
 export function ShopBrowser({ products }: { products: MgdProduct[] }) {
   const { location } = useLocation();
@@ -33,35 +40,42 @@ export function ShopBrowser({ products }: { products: MgdProduct[] }) {
   const sortId = useId();
 
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState<string>("All");
-  const [brand, setBrand] = useState<string>("All");
-  const [size, setSize] = useState<string>("All");
+  const [categoryId, setCategoryId] = useState<string>(ALL);
+  const [brand, setBrand] = useState<string>(ALL);
+  const [size, setSize] = useState<string>(ALL);
   const [band, setBand] = useState<number | null>(null);
   const [inStockOnly, setInStockOnly] = useState(false);
   const [sort, setSort] = useState<Sort>("featured");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  // Size lives on the fixture, not on the MGD row, so it is looked up by id.
-  const sizeById = useMemo(
-    () => new Map(PRODUCT_FIXTURES.map((p) => [p.id, p.size])),
-    [],
-  );
+  const categories = useMemo(() => categoriesFrom(products), [products]);
+  const brands = useMemo(() => brandsFrom(products), [products]);
+  const sizes = useMemo(() => sizesFrom(products), [products]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
 
     const filtered = products.filter((product) => {
-      if (category !== "All" && product.category !== category) return false;
-      if (brand !== "All" && product.brand !== brand) return false;
-      if (size !== "All" && sizeById.get(product.id) !== size) return false;
+      if (categoryId !== ALL && product.category?.id !== categoryId) return false;
+      if (brand !== ALL && product.brand !== brand) return false;
+      if (size !== ALL && product.size !== size) return false;
       if (band !== null) {
         const range = PRICE_BANDS[band];
         if (product.price < range.min || product.price > range.max) return false;
       }
-      if (inStockOnly && product.stock <= 0) return false;
+      // Matches the API's rule: drops only out_of_stock.
+      if (inStockOnly && isOutOfStock(product)) return false;
       if (q) {
-        const haystack =
-          `${product.name} ${product.brand ?? ""} ${product.variant ?? ""} ${product.category ?? ""}`.toLowerCase();
+        const haystack = [
+          product.name,
+          product.brand,
+          product.size,
+          product.category?.name,
+          product.sku,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
@@ -75,21 +89,23 @@ export function ShopBrowser({ products }: { products: MgdProduct[] }) {
       case "name":
         return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
       default:
+        // "Featured" is the owner's display order, which is the order the API
+        // already returned — preserve it rather than imposing our own.
         return filtered;
     }
-  }, [products, query, category, brand, size, band, inStockOnly, sort, sizeById]);
+  }, [products, query, categoryId, brand, size, band, inStockOnly, sort]);
 
   const activeFilters =
-    (category !== "All" ? 1 : 0) +
-    (brand !== "All" ? 1 : 0) +
-    (size !== "All" ? 1 : 0) +
+    (categoryId !== ALL ? 1 : 0) +
+    (brand !== ALL ? 1 : 0) +
+    (size !== ALL ? 1 : 0) +
     (band !== null ? 1 : 0) +
     (inStockOnly ? 1 : 0);
 
   function clearFilters() {
-    setCategory("All");
-    setBrand("All");
-    setSize("All");
+    setCategoryId(ALL);
+    setBrand(ALL);
+    setSize(ALL);
     setBand(null);
     setInStockOnly(false);
     setQuery("");
@@ -160,25 +176,36 @@ export function ShopBrowser({ products }: { products: MgdProduct[] }) {
             </button>
           </div>
 
-          <FilterGroup
-            label="Category"
-            options={[...PRODUCT_CATEGORIES]}
-            value={category}
-            onChange={setCategory}
-          />
-          <FilterGroup
-            label="Brand"
-            options={[...PRODUCT_BRANDS]}
-            value={brand}
-            onChange={setBrand}
-          />
-          <FilterGroup
-            label="Size"
-            options={[...PRODUCT_SIZES]}
-            value={size}
-            onChange={setSize}
-            shape="square"
-          />
+          {categories.length > 0 ? (
+            <FilterGroup
+              label="Category"
+              options={[
+                { value: ALL, label: ALL },
+                ...categories.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              value={categoryId}
+              onChange={setCategoryId}
+            />
+          ) : null}
+
+          {brands.length > 0 ? (
+            <FilterGroup
+              label="Brand"
+              options={[ALL, ...brands].map((b) => ({ value: b, label: b }))}
+              value={brand}
+              onChange={setBrand}
+            />
+          ) : null}
+
+          {sizes.length > 0 ? (
+            <FilterGroup
+              label="Size"
+              options={[ALL, ...sizes].map((s) => ({ value: s, label: s }))}
+              value={size}
+              onChange={setSize}
+              shape="square"
+            />
+          ) : null}
 
           <div className="mb-2.5 text-[11px] font-bold uppercase tracking-[.12em] text-muted">
             Price
@@ -218,7 +245,8 @@ export function ShopBrowser({ products }: { products: MgdProduct[] }) {
         <div>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <span className="text-[13px] text-muted" aria-live="polite">
-              {visible.length} of {products.length} products
+              {visible.length} of {products.length}{" "}
+              {products.length === 1 ? "product" : "products"}
             </span>
             <span className="text-[12px] text-muted">
               Free pickup at {location.short_name} · Shipping{" "}
@@ -259,7 +287,7 @@ function FilterGroup({
   shape = "pill",
 }: {
   label: string;
-  options: string[];
+  options: Array<{ value: string; label: string }>;
   value: string;
   onChange: (next: string) => void;
   shape?: "pill" | "square";
@@ -275,13 +303,13 @@ function FilterGroup({
         aria-label={`Filter by ${label.toLowerCase()}`}
       >
         {options.map((option) => {
-          const active = option === value;
+          const active = option.value === value;
           return (
             <button
-              key={option}
+              key={option.value}
               type="button"
               aria-pressed={active}
-              onClick={() => onChange(option)}
+              onClick={() => onChange(option.value)}
               className={`cursor-pointer border px-[13px] py-[7px] text-[12px] font-semibold ${
                 shape === "pill" ? "rounded-pill" : "min-w-11 rounded-lg"
               } ${
@@ -290,7 +318,7 @@ function FilterGroup({
                   : "border-line bg-transparent text-text hover:border-accent"
               }`}
             >
-              {option}
+              {option.label}
             </button>
           );
         })}

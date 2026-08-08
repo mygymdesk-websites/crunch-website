@@ -1,8 +1,8 @@
 /**
  * MyGymDesk Website API — response types.
  *
- * Transcribed from `docs/website-api-integration.md` v1.1 (2026-07-20). Field
- * names and nullability match the document exactly; where the document is
+ * Transcribed from `docs/website-api-integration.md` **v1.4 (2026-08-08)**.
+ * Field names and nullability match the document exactly; where the document is
  * explicit about a quirk, the quirk is encoded in the type and noted here.
  *
  * Notable contract details that bite if you skim:
@@ -11,7 +11,17 @@
  *   - `website-booking-order.amount` is in PAISE, everything else is rupees;
  *   - a session's `id` is the next real occurrence and CHANGES over time —
  *     never cache it, re-fetch immediately before booking;
- *   - `website-session-price` returns `valid: false` with HTTP 200.
+ *   - `website-session-price` returns `valid: false` with HTTP 200;
+ *   - `?location_id=` is a SUB-FILTER inside the key's scope (1.2). It can
+ *     never widen scope; naming another branch is `403 location_out_of_scope`;
+ *   - `sport` (classes) is `""` when unset, `category` (services) is `null` —
+ *     the asymmetry is real (1.3);
+ *   - `currency` on `resource=plans` can be overridden PER ROW (1.3);
+ *   - `intervalLabel` can be the empty string when a plan has no duration —
+ *     render the price alone rather than an empty suffix (1.3);
+ *   - member pricing is gone: `is_member` with `booking_type=service` is
+ *     `422 member_pricing_unsupported` (1.3). It remains an accepted no-op on
+ *     classes, which have a single fee.
  */
 
 // ---------------------------------------------------------------------------
@@ -48,7 +58,11 @@ export interface MgdCustomer {
 export interface CaptureLeadRequest {
   /** Required, ≥ 2 chars after sanitising, max 200. */
   name: string;
-  /** Required, 8–15 digits; `+`, spaces, `-`, `()` are stripped. Max 20. */
+  /**
+   * Required. Must be 8–15 digits after `+`, spaces, `-`, `(`, `)` are
+   * stripped — and NOTHING else is stripped, so a dot or a letter fails.
+   * Truncated to 20 chars first.
+   */
   phone: string;
   email?: string;
   interest?: string;
@@ -58,6 +72,14 @@ export interface CaptureLeadRequest {
   /** Page URL / UTM source. Max 500. */
   source_details?: string;
   city?: string;
+  /**
+   * *(1.4)* File the lead on a specific branch.
+   *
+   * A tenant-wide key may name any of the gym's branches; a branch key may
+   * name only its own. It is a sub-filter — it can never widen the key's
+   * scope. Absent ⇒ the key's branch, else the gym's primary branch.
+   */
+  location_id?: string;
 }
 
 export interface CaptureLeadResponse {
@@ -66,6 +88,13 @@ export interface CaptureLeadResponse {
   lead_id: string;
   /** `created` → HTTP 201 (new phone) · `updated` → HTTP 200 (re-enquiry). */
   action: "created" | "updated";
+  /**
+   * *(1.4)* Which branch the lead was actually filed on — reflects the
+   * fallback too, not just an explicit request `location_id`. Both are null
+   * only for a gym with no active branches.
+   */
+  location_id: string | null;
+  location_name: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -85,9 +114,17 @@ export interface MgdPlan {
   name: string;
   /** Major units (rupees). `0` means no price set → render "Contact us". */
   price: number;
+  /**
+   * *(1.3)* Can be overridden PER ROW — two rows in one response may differ.
+   * Read it per plan, never once for the list.
+   */
   currency: Currency;
   interval: PlanInterval;
-  /** Human-readable and always accurate, e.g. "per quarter". Prefer this. */
+  /**
+   * Human-readable and always accurate, e.g. "per quarter". Prefer this.
+   * *(1.3)* Can be the EMPTY STRING when the plan has no duration set —
+   * render the price alone rather than an empty suffix.
+   */
   intervalLabel: string;
   /** Raw plan length; use it when `interval` is a value you don't recognise. */
   durationDays: number | null;
@@ -135,7 +172,8 @@ export interface ServicesCatalogResponse {
 export interface MgdClassType {
   id: string;
   name: string;
-  sport: string | null;
+  /** *(1.3)* `""` when unset — NOT null. Services use `null` for `category`. */
+  sport: string;
   intensity: Intensity;
   durationMin: number;
   description: string | null;
@@ -175,7 +213,8 @@ export interface MgdClassSession {
   startTime: string;
   durationMin: number;
   name: string;
-  sport: string | null;
+  /** *(1.3)* `""` when unset — NOT null. */
+  sport: string;
   instructorName: string | null;
   instructorAvatarUrl: string | null;
   intensity: Intensity;
@@ -303,27 +342,91 @@ export interface BookingResponse {
 // MgdNotYetLiveError rather than issuing a request against a 404.
 // ---------------------------------------------------------------------------
 
-/** A1 — `GET website-products`. */
+// ---------------------------------------------------------------------------
+// website-products — the shop catalogue  *(1.4, LIVE)*
+// ---------------------------------------------------------------------------
+
+/**
+ * Tri-state stock.
+ *
+ * Exact quantities are DELIBERATELY never exposed by the API. Any UI that
+ * wants to say "only 3 left" is inventing a number — say "Low stock".
+ */
+export type StockStatus = "in_stock" | "low_stock" | "out_of_stock";
+
+export interface MgdProductCategory {
+  id: string;
+  name: string;
+}
+
+/** Per-branch stock, present only for a tenant-wide key. */
+export interface MgdProductBranchStock {
+  locationId: string;
+  locationName: string;
+  stockStatus: StockStatus;
+}
+
 export interface MgdProduct {
   id: string;
   name: string;
-  brand: string | null;
-  category: string | null;
-  /** Size or variant label, e.g. "1 kg · Chocolate". */
-  variant: string | null;
-  /** Major units (rupees). */
+  /** Owner's public description when set, else the internal one. */
+  description: string | null;
+  category: MgdProductCategory | null;
+  /**
+   * THE ALL-IN CHARGED AMOUNT in major units, tax handling included.
+   * Display as-is — checkout will never show a different number.
+   */
   price: number;
-  /** MRP for the strikethrough; null when there is no discount. */
-  listPrice: number | null;
-  stock: number;
+  /**
+   * Strike-through list price. OMITTED when not set or not above `price`, so
+   * never assert on its presence — check for undefined before rendering.
+   */
+  mrp?: number;
+  currency: Currency;
+  unit: string | null;
+  sku: string | null;
   imageUrl: string | null;
+  /** Free text, nullable. */
+  brand: string | null;
+  /**
+   * Display-only size label ("1kg", "L"). There is NO variant engine — a size
+   * run is separate products.
+   */
+  size: string | null;
+  /** Convenience boolean: `stockStatus !== "out_of_stock"`. */
+  inStock: boolean;
+  /**
+   * With a branch key or `?location_id=`, this is that branch's status.
+   * For a tenant-wide key it is the whole-gym aggregate — see
+   * `stockByLocation` for the per-branch breakdown.
+   */
+  stockStatus: StockStatus;
+  /** Present for a tenant-wide key: per-branch statuses, no counts. */
+  stockByLocation?: MgdProductBranchStock[];
+  displayOrder: number;
+}
+
+/**
+ * Note the ENVELOPE: `currency`, `locationId` and `locationName` sit at the
+ * top level alongside `products`, not only on each row. Ordering is the
+ * owner's display order, then name.
+ */
+export interface ProductsResponse {
+  products: MgdProduct[];
   currency: Currency;
   locationId: string | null;
   locationName: string | null;
 }
 
-export interface ProductsResponse {
-  products: MgdProduct[];
+export interface ProductQuery {
+  /** Sub-filter within the key's scope; stock is then that branch's. */
+  locationId?: string | null;
+  /** Unknown categories return an empty list, not an error. */
+  categoryId?: string | null;
+  /** Case-insensitive exact match on brand. */
+  brand?: string | null;
+  /** Drops ONLY `out_of_stock`; `low_stock` stays visible. */
+  inStockOnly?: boolean;
 }
 
 /** A2 — `POST website-shop-order-create`. */

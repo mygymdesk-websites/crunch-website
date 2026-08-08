@@ -1,8 +1,10 @@
 import type { MetadataRoute } from "next";
 
 import { POLICY_DOCS } from "@/content/policies";
-import { PRODUCT_FIXTURES } from "@/lib/fixtures/products";
+import { getProducts } from "@/lib/content";
+import { productSlug } from "@/lib/shop";
 import { siteUrl } from "@/lib/site";
+import { getDefaultLocation } from "@/lib/site-settings";
 
 /**
  * sitemap.xml
@@ -10,11 +12,16 @@ import { siteUrl } from "@/lib/site";
  * Public, indexable routes only. /account and /checkout are per-visitor and
  * carry `robots: noindex` in their own metadata, so they are absent here too.
  *
+ * Product URLs come from the live catalogue at the default location. A gym
+ * with an unreachable API or nothing published still gets a valid sitemap of
+ * its core pages — `getProducts` degrades to an empty list rather than
+ * throwing, so this never fails the build.
+ *
  * PHASE 6 adds the legacy 301 map (PRD §B6): crawl the old PHP site, map every
  * legacy URL onto its new route in next.config.ts `redirects()`, and submit
  * this sitemap to Search Console.
  */
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteUrl();
   const now = new Date();
 
@@ -29,8 +36,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ] satisfies MetadataRoute.Sitemap
   ).map((entry) => ({ ...entry, lastModified: now }));
 
-  const products: MetadataRoute.Sitemap = PRODUCT_FIXTURES.map((product) => ({
-    url: `${base}/shop/${product.slug}`,
+  const location = await getDefaultLocation();
+  const { data } = await getProducts(location);
+
+  const products: MetadataRoute.Sitemap = data.products.map((product) => ({
+    url: `${base}/shop/${productSlug(product)}`,
     lastModified: now,
     changeFrequency: "daily",
     priority: 0.6,

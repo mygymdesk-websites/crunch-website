@@ -9,7 +9,7 @@
  * thing that is consistent across all of them.
  */
 
-/** Documented `error` codes, plus room for ones added after v1.1. */
+/** Documented `error` codes, plus room for ones added after v1.4. */
 export type MgdErrorCode =
   // auth / transport
   | "unauthorized"
@@ -18,12 +18,17 @@ export type MgdErrorCode =
   | "rate_limit_exceeded"
   | "method_not_allowed"
   | "internal_error"
+  // scope — a key's branch bounds both reads and writes (1.2)
+  | "location_out_of_scope"
+  | "session_out_of_scope"
   // request shape
   | "invalid_json"
   | "invalid_body"
-  | "unknown resource"
+  // renamed from "unknown resource" in 1.2
+  | "unknown_resource"
   | "invalid_location_id"
   | "location_not_found"
+  | "invalid_category_id"
   | "invalid_session_id"
   | "invalid_booking_type"
   | "invalid_name"
@@ -32,6 +37,9 @@ export type MgdErrorCode =
   | "invalid_gateway"
   | "invalid_capture_id"
   | "invalid_order_id"
+  | "payload_too_large"
+  // member pricing was removed from this API in 1.3
+  | "member_pricing_unsupported"
   // payment verification
   | "payment_verification_failed"
   | "payment_not_captured"
@@ -54,6 +62,7 @@ export type MgdErrorCode =
   | "gateway_error"
   | "db_lookup_error"
   | "member_create_failed"
+  | "lead_write_failed"
   // client-side, not from the API
   | "network_error"
   | "not_configured"
@@ -151,6 +160,17 @@ export function humanizeMgdError(error: unknown): string {
   }
 
   switch (error.code) {
+    case "location_out_of_scope":
+    case "session_out_of_scope":
+      // A scope error is a misconfiguration on our side (wrong branch id, or a
+      // branch-scoped key), never something the visitor did.
+      return "We couldn't load that gym's details. Please try another location, or call us.";
+    case "member_pricing_unsupported":
+      return "Member pricing is handled in the Member App. This page shows the standard rate.";
+    case "payload_too_large":
+      return "That message is too long. Please shorten it and try again.";
+    case "lead_write_failed":
+      return "We couldn't save your enquiry. Please try again, or call the gym.";
     case "slot_full":
       return "That slot filled up while you were booking. Nothing has been charged.";
     case "already_booked":
