@@ -18,7 +18,15 @@
 -- no use for, and the view already filters on it.
 -- ============================================================================
 
-create or replace view public.site_settings_public
+-- DROP + CREATE, not CREATE OR REPLACE: replacing a view can only APPEND
+-- columns, never insert one mid-list. Adding mgd_location_id before
+-- is_default reads to Postgres as renaming is_default, which it refuses
+-- ("cannot change name of view column"). Dropping first keeps the column
+-- order logical; nothing but the app reads this view, and the grant is
+-- re-issued below (a dropped view takes its grants with it).
+drop view if exists public.site_settings_public;
+
+create view public.site_settings_public
 with (security_invoker = false)
 as
   select

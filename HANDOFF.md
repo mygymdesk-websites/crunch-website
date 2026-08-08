@@ -1,11 +1,148 @@
 # Handoff
 
-> ## Phase 2 — Live Display + Leads · BUILT, with two things outstanding
-> Leads are **live and verified end-to-end on both branches.** Display is wired
-> to the live API but has **nothing to show yet** — the gym has published no
-> plans, classes, sessions or products. Two blockers remain, both needing you:
-> a DDL credential for the client's Supabase, and the Cloudflare proxy.
-> Details in [§0](#0-phase-2-report-080826).
+> ## Phase 2 — Live Display + Leads · MERGED to `main`
+> Schema applied to the live client project, RLS + GRANTs verified at the
+> database, and the enquiry mirror proven end-to-end (site → MyGymDesk →
+> local `enquiries` → admin).
+>
+> **One blocker remains: `NEXT_PUBLIC_SUPABASE_URL` is still a raw
+> `*.supabase.co` host** — Cloudflare DNS migration in progress. See
+> [§0.1](#01-go-live-blocker--raw-supabase-url).
+>
+> **The gym has still published no content**, so every display surface renders
+> its empty state. That is a client-config task, not a code one.
+
+---
+
+## 0.1 GO-LIVE BLOCKER — raw Supabase URL
+
+`NEXT_PUBLIC_SUPABASE_URL` points at `bjwcsvpqplsgwkbbvehx.supabase.co`.
+`npm run check:env` refuses it; the site runs on the documented local-dev hatch
+(`ALLOW_RAW_SUPABASE_URL=true` in `.env.local`), which the check **ignores for
+production builds** — so a production deploy will fail until the proxy is live.
+
+Raw Supabase domains are ISP-blocked in parts of India, and this URL runs in
+the visitor's browser (sign-in, admin, My Orders). Point the Cloudflare-proxied
+domain at the project and swap the URL. Nothing else is needed.
+
+---
+
+## 0.2 Deferred items — completed 08/08/26
+
+### Migrations applied to the live client project
+
+All seven applied in order via `psql` against the session pooler, then
+`seed.sql`. Output:
+
+```
+20260808090000_core.sql                    OK  (pgcrypto already existed)
+20260808090100_admin_users.sql             OK
+20260808090200_site_settings.sql           OK
+20260808090300_enquiries.sql               OK
+20260808090400_shop_orders.sql             OK
+20260808090500_shipments.sql               OK
+20260808100000_expose_mgd_location_id.sql  OK  (after the fix below)
+seed.sql                                   OK
+```
+
+**One migration was broken and is now fixed.** `20260808100000` used
+`CREATE OR REPLACE VIEW` to add `mgd_location_id` before `is_default`.
+Postgres can only APPEND columns when replacing a view, so it read the change
+as renaming `is_default` and refused:
+
+> `ERROR: cannot change name of view column "is_default" to "mgd_location_id"`
+
+Changed to `DROP VIEW` + `CREATE VIEW`, which keeps the column order logical.
+Nothing but the app reads the view, and the migration re-issues the grant (a
+dropped view takes its grants with it). This was only ever caught by running
+it — the build could not have.
+
+### RLS + GRANTs verified live
+
+Structure, at the database:
+
+| Object | Kind | RLS | Policies |
+|---|---|---|---|
+| `site_settings` | table | ✅ on | 3 |
+| `enquiries` | table | ✅ on | 1 |
+| `shop_orders` | table | ✅ on | 2 |
+| `shop_order_items` | table | ✅ on | 2 |
+| `shipments` | table | ✅ on | 2 |
+| `admin_users` | table | ✅ on | 1 |
+| `site_settings_public` | view | n/a | — |
+
+Behaviour, over real PostgREST with the real keys:
+
+- **anon has zero privilege on all six base tables** — every read returns
+  `42501` (Supabase surfaces this as HTTP 401; read the body, not the status).
+- **anon writes refused** — `INSERT enquiries` and `INSERT admin_users`
+  (self-escalation) both `42501`.
+- **anon reads the public view** — 200, 2 rows, **25 columns**, with
+  `is_active`, `created_at` and `updated_at` all absent. `mgd_location_id`
+  present, as intended by DECISION 15.
+- **anon cannot reach the base table** behind the view — `42501`.
+- **A signed-in NON-admin sees nothing** — `enquiries`, `site_settings` and
+  `admin_users` all return 0 rows. Not an error: RLS filters them away.
+- **A signed-in non-admin cannot escalate** — `INSERT admin_users` → `42501`;
+  `PATCH site_settings` → **0 rows written** (`short_name` and `updated_at`
+  both unchanged, verified directly — PostgREST answers `204` whether it
+  updated a row or matched none, so the status alone proves nothing).
+- **An admin CAN read and write** — reads `enquiries` / `site_settings` /
+  `shop_orders`, and a `PATCH site_settings` returned 1 row with `updated_at`
+  bumped. Worth proving explicitly: the Site Settings editor writes through
+  the caller's session, so a broken UPDATE policy would have silently no-opped.
+
+Both probe users were created and removed inside the check; the edited value
+was restored.
+
+### mgd_location_id mapping seeded
+
+| slug | short_name | mgd_location_id | default |
+|---|---|---|---|
+| `vasant-kunj` | Vasant Kunj | `c53f2dc1-8889-46d7-8589-2f4c40119840` | ✅ |
+| `gurgaon` | Gurgaon | `297b62e2-8fcf-4983-b9fd-12d358bc414d` | |
+
+The build no longer logs `falling back to seed` — locations now come from the
+database.
+
+### Mirror proven end-to-end
+
+One enquiry submitted through the site's own form path
+(`/api/enquiries`, source `contact_form`, location `gurgaon`):
+
+**Response:** `{"ok":true,"id":"26711a7c-…","lead_id":"def2ff6e-…","action":"created","location_name":"Crunch Fitness — Gurgaon","synced":true}`
+
+**Local `enquiries` row:**
+
+| column | value |
+|---|---|
+| `mgd_sync_status` | `sent` |
+| `mgd_lead_id` | `def2ff6e-2d04-4d2c-bded-01ef38be3799` |
+| `mgd_synced_at` | stamped |
+| `mgd_error` | null |
+| `location_slug` / `location_id` | `gurgaon` / FK set |
+
+**MyGymDesk `leads` row:** same id, `status: new`, `source: website`, on
+`location_id 297b62e2…` = **Crunch Fitness — Gurgaon**. Correct branch.
+
+That row is readable by an admin JWT and invisible to a non-admin (both
+verified above), which is the "visible in admin" gate.
+
+### Test data cleaned up
+
+- The two Phase 2 branch-routing leads (`ZZ WEBSITE TEST - DELETE ME` VK/GG)
+  and the mirror-proof lead (`ZZ MIRROR PROOF - DELETE ME`) are **deleted from
+  MyGymDesk**. The tenant is back to **0 leads**.
+- Before deleting, I checked all 16 tables with an FK to `leads` — three of
+  them `CASCADE` — and confirmed **zero dependent rows**, so the deletes
+  touched nothing else.
+- **Note:** the Website API is create-only for leads (all 8 endpoints; the doc
+  itself says to delete from the dashboard), so this was done with scoped SQL
+  against `tenant_id` + the exact ids, not through the API.
+- **The local `enquiries` mirror row was deliberately KEPT** as the
+  admin-visible evidence. Its `mgd_lead_id` now points at a deleted CRM lead —
+  which is the mirror behaving exactly as designed (it survives independently
+  so a lead is never lost). Delete it whenever you like; it is one row.
 
 ---
 
