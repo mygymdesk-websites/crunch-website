@@ -1,26 +1,273 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Crunch Fitness — brand tokens.
+
+   Ported 1:1 from the Claude Design export (tokens/colors.css,
+   tokens/typography.css). These are the ONLY place brand values are declared.
+   When the client's final palette/type arrive, edit this block and nothing
+   else — every component reads through the Tailwind theme mapping below.
+--------------------------------------------------------------------------- */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* base */
+  --bg: #f6f4f1;
+  --surface: #ffffff;
+  --surface2: #ede9e3;
+  --text: #101013;
+  --muted: #5b5b63;
+  --line: rgba(0, 0, 0, 0.14);
+  --accent: #ff3d14;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(255, 61, 20, 0.1);
+  /* image-placeholder stripes */
+  --ph1: #e4e0da;
+  --ph2: #edeae5;
+
+  /* elevation — shadows only on floating elements */
+  --shadow-float: 0 14px 36px rgba(0, 0, 0, 0.26);
+  --shadow-menu: 0 18px 44px rgba(0, 0, 0, 0.2);
+  --shadow-featured: 0 18px 50px rgba(0, 0, 0, 0.16);
+
+  /* radii */
+  --radius-card: 14px;
+  --radius-field: 10px;
+  --radius-pill: 999px;
+
+  /* type */
+  --font-display: var(--font-oswald), "Archivo Narrow", var(--font-archivo), sans-serif;
+  --font-body: var(--font-archivo), Helvetica, Arial, sans-serif;
 }
 
+[data-theme="dark"] {
+  --bg: #0b0b0c;
+  --surface: #131316;
+  --surface2: #1b1b20;
+  --text: #f6f4f1;
+  --muted: #9c9ca5;
+  --line: rgba(255, 255, 255, 0.12);
+  --accent: #ff3d14;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(255, 61, 20, 0.16);
+  --ph1: #191920;
+  --ph2: #212129;
+  --shadow-menu: 0 18px 44px rgba(0, 0, 0, 0.34);
+  --shadow-featured: 0 18px 50px rgba(0, 0, 0, 0.24);
+}
+
+/* Map brand tokens into Tailwind's theme so utilities like `bg-surface`,
+   `text-muted`, `border-line`, `rounded-card`, `font-display` resolve. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface2: var(--surface2);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-ph1: var(--ph1);
+  --color-ph2: var(--ph2);
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+
+  --radius-card: var(--radius-card);
+  --radius-field: var(--radius-field);
+  --radius-pill: var(--radius-pill);
+
+  --shadow-float: var(--shadow-float);
+  --shadow-menu: var(--shadow-menu);
+  --shadow-featured: var(--shadow-featured);
+
+  /* 1320px max content width, per the design system */
+  --spacing-content: 1320px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* --------------------------------------------------------------------------
+   Base — matches the export's reset exactly.
+-------------------------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  /* `clip` (not `hidden`) so position:sticky headers keep working */
+  overflow-x: clip;
+}
+
+a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--accent);
+}
+
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+}
+
+/* --------------------------------------------------------------------------
+   Motion — every keyframe used across the design export.
+-------------------------------------------------------------------------- */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes countUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes floatY {
+  0%,
+  100% {
+    transform: translateY(-7px);
+  }
+  50% {
+    transform: translateY(7px);
+  }
+}
+@keyframes pulseRing {
+  0%,
+  100% {
+    transform: scale(0.965);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+}
+@keyframes spinSlow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes heartBeat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.3);
+  }
+  45% {
+    transform: scale(1);
+  }
+  65% {
+    transform: scale(1.15);
+  }
+  80% {
+    transform: scale(1);
+  }
+}
+@keyframes fillBar {
+  from {
+    width: 0;
+  }
+}
+@keyframes progressStripe {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 28px 0;
+  }
+}
+@keyframes shimmer {
+  0% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.55;
+  }
+}
+
+/* Scroll-reveal: the export uses `animation-timeline: view()`. Where that is
+   unsupported the element must still be visible, so the fallback is "no
+   animation" rather than "stuck at opacity 0". */
+.reveal {
+  animation: fadeUp 0.8s both;
+}
+@supports (animation-timeline: view()) {
+  .reveal {
+    animation: fadeUp 0.8s both;
+    animation-timeline: view();
+    animation-fill-mode: none;
+    animation-range: entry 0% entry 28%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Striped image placeholder, per the design system's documented pattern. */
+.striped-placeholder {
+  background: repeating-linear-gradient(
+    48deg,
+    var(--ph1) 0 14px,
+    var(--ph2) 14px 28px
+  );
+}
+
+/* Visible keyboard focus — the export styles focus on fields only, this keeps
+   the rest of the page keyboard-navigable without changing the visual design. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Hide scrollbars on the horizontally-scrolling tab strips. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }

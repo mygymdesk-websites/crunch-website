@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Packages &amp; Memberships — Crunch Fitness</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Oswald:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F6F4F1; --surface:#FFFFFF; --surface2:#EDE9E3; --text:#101013; --muted:#5B5B63;
+  --line:rgba(0,0,0,.14); --accent:#FF3D14; --accent-ink:#FFFFFF; --accent-soft:rgba(255,61,20,.10);
+  --display:Oswald,Archivo,sans-serif; --ph1:#E4E0DA; --ph2:#EDEAE5;
+}
+[data-theme="dark"]{
+  --bg:#0B0B0C; --surface:#131316; --surface2:#1B1B20; --text:#F6F4F1; --muted:#9C9CA5;
+  --line:rgba(255,255,255,.12); --accent-soft:rgba(255,61,20,.16); --ph1:#191920; --ph2:#212129;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:Archivo,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:clip}
+a{color:var(--text);text-decoration:none}
+a:hover{color:var(--accent)}
+input,select,textarea,button{font-family:inherit}
+@keyframes fadeUp{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+@keyframes shimmer{0%{opacity:.55}50%{opacity:1}100%{opacity:.55}}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</helmet>
+
+<div style="background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:72px">
+
+  <header style="position:sticky;top:0;z-index:60;background:var(--surface);border-bottom:1px solid var(--line)">
+    <div style="max-width:1320px;margin:0 auto;padding:0 16px;height:68px;display:flex;align-items:center;gap:12px">
+      <a href="Crunch Fitness Home.dc.html" style="display:flex;align-items:center;gap:9px;flex-shrink:0">
+        <span style="width:24px;height:24px;background:var(--accent);display:block;transform:skewX(-12deg)"></span>
+        <span style="font-family:var(--display);font-weight:600;font-size:21px;letter-spacing:.06em;line-height:1;text-transform:uppercase">Crunch<span style="color:var(--accent)">.</span></span>
+      </a>
+      <sc-if value="{{ isWide }}" hint-placeholder-val="{{ true }}">
+        <nav style="display:flex;gap:18px;margin-left:14px;flex:1 1 auto;min-width:0;flex-wrap:nowrap">
+          <a href="Crunch Fitness Home.dc.html" style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap">Home</a>
+          <a href="Crunch Fitness About.dc.html" style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap">About</a>
+          <a href="Crunch Fitness Classes.dc.html" style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap">Classes</a>
+          <a href="Crunch Fitness Packages.dc.html" style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);white-space:nowrap">Packages</a>
+          <a href="#" style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap">Shop</a>
+          <a href="#" style="font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap">Contact</a>
+        </nav>
+      </sc-if>
+      <sc-if value="{{ isWide }}" hint-placeholder-val="{{ true }}">
+        <div style="position:relative;flex-shrink:0">
+          <button onClick="{{ toggleLocMenu }}" style="display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--line);border-radius:999px;padding:8px 13px;color:var(--text);cursor:pointer" style-hover="border-color:var(--accent)">
+            <span style="width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0"></span>
+            <span style="font-size:12px;font-weight:600;letter-spacing:.03em;white-space:nowrap">{{ locShort }}</span>
+            <span style="font-size:9px;color:var(--muted)">▼</span>
+          </button>
+          <sc-if value="{{ locMenuOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;top:46px;right:0;width:280px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 18px 44px rgba(0,0,0,.2);overflow:hidden;z-index:80">
+              <div style="padding:12px 16px;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)">Choose your gym</div>
+              <button onClick="{{ pickVK }}" style="width:100%;text-align:left;display:flex;align-items:center;gap:12px;background:{{ vkRowBg }};border:0;border-bottom:1px solid var(--line);padding:14px 16px;color:var(--text);cursor:pointer" style-hover="background:var(--surface2)">
+                <span style="flex:1 1 auto;min-width:0"><span style="display:block;font-size:14px;font-weight:600">Crunch Fitness, Vasant Kunj</span><span style="display:block;font-size:12px;color:var(--muted);margin-top:2px">New Delhi · 05:30 – 22:30</span></span>
+                <span style="color:var(--accent);font-size:14px;flex-shrink:0">{{ vkTick }}</span>
+              </button>
+              <button onClick="{{ pickGG }}" style="width:100%;text-align:left;display:flex;align-items:center;gap:12px;background:{{ ggRowBg }};border:0;padding:14px 16px;color:var(--text);cursor:pointer" style-hover="background:var(--surface2)">
+                <span style="flex:1 1 auto;min-width:0"><span style="display:block;font-size:14px;font-weight:600">Crunch Fitness, Gurgaon</span><span style="display:block;font-size:12px;color:var(--muted);margin-top:2px">Haryana · 06:00 – 22:00</span></span>
+                <span style="color:var(--accent);font-size:14px;flex-shrink:0">{{ ggTick }}</span>
+              </button>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+      <button onClick="{{ toggleTheme }}" title="Toggle theme" style="width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer;font-size:14px;flex-shrink:0" style-hover="border-color:var(--accent)">{{ themeIcon }}</button>
+      <button title="Cart" style="position:relative;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer;font-size:15px;flex-shrink:0;line-height:1" style-hover="border-color:var(--accent)">
+        🛒<span style="position:absolute;top:-4px;right:-4px;min-width:17px;height:17px;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:10px;font-weight:700;display:grid;place-items:center;padding:0 4px">2</span>
+      </button>
+      <sc-if value="{{ isWide }}" hint-placeholder-val="{{ true }}">
+        <a href="#" style="font-size:13px;font-weight:600;letter-spacing:.03em;white-space:nowrap;flex-shrink:0">Sign In</a>
+      </sc-if>
+      <sc-if value="{{ isWide }}" hint-placeholder-val="{{ true }}">
+        <button onClick="{{ openTrial }}" style="background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:11px 20px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;white-space:nowrap;flex-shrink:0" style-hover="filter:brightness(1.08)">Book Free Trial</button>
+      </sc-if>
+      <sc-if value="{{ isNarrow }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ toggleMenu }}" title="Menu" style="width:44px;height:38px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer;flex-shrink:0;display:grid;place-items:center;gap:4px;padding:0 12px">
+          <span style="display:block;width:18px;height:2px;background:var(--text)"></span>
+          <span style="display:block;width:18px;height:2px;background:var(--text)"></span>
+          <span style="display:block;width:18px;height:2px;background:var(--text)"></span>
+        </button>
+      </sc-if>
+    </div>
+    <sc-if value="{{ isNarrow }}" hint-placeholder-val="{{ false }}">
+      <div style="border-top:1px solid var(--line);background:var(--surface2)">
+        <button onClick="{{ toggleLocMenu }}" style="width:100%;display:flex;align-items:center;gap:8px;background:transparent;border:0;padding:10px 16px;color:var(--text);cursor:pointer;text-align:left">
+          <span style="width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0"></span>
+          <span style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1 1 auto;min-width:0">{{ locName }}</span>
+          <span style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);flex-shrink:0">Change ▼</span>
+        </button>
+        <sc-if value="{{ locMenuOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="border-top:1px solid var(--line);background:var(--surface)">
+            <button onClick="{{ pickVK }}" style="width:100%;text-align:left;display:flex;align-items:center;gap:12px;background:{{ vkRowBg }};border:0;border-bottom:1px solid var(--line);padding:14px 16px;color:var(--text);cursor:pointer">
+              <span style="flex:1 1 auto;min-width:0"><span style="display:block;font-size:14px;font-weight:600">Crunch Fitness, Vasant Kunj</span><span style="display:block;font-size:12px;color:var(--muted);margin-top:2px">New Delhi · 05:30 – 22:30</span></span>
+              <span style="color:var(--accent);font-size:14px;flex-shrink:0">{{ vkTick }}</span>
+            </button>
+            <button onClick="{{ pickGG }}" style="width:100%;text-align:left;display:flex;align-items:center;gap:12px;background:{{ ggRowBg }};border:0;padding:14px 16px;color:var(--text);cursor:pointer">
+              <span style="flex:1 1 auto;min-width:0"><span style="display:block;font-size:14px;font-weight:600">Crunch Fitness, Gurgaon</span><span style="display:block;font-size:12px;color:var(--muted);margin-top:2px">Haryana · 06:00 – 22:00</span></span>
+              <span style="color:var(--accent);font-size:14px;flex-shrink:0">{{ ggTick }}</span>
+            </button>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+    <sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="border-top:1px solid var(--line);background:var(--surface);padding:16px 16px 22px">
+        <div style="display:grid;gap:2px;margin-bottom:16px">
+          <a href="Crunch Fitness Home.dc.html" style="font-size:15px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:12px 0;border-bottom:1px solid var(--line)">Home</a>
+          <a href="Crunch Fitness About.dc.html" style="font-size:15px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:12px 0;border-bottom:1px solid var(--line)">About</a>
+          <a href="Crunch Fitness Classes.dc.html" style="font-size:15px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:12px 0;border-bottom:1px solid var(--line)">Classes</a>
+          <a href="Crunch Fitness Packages.dc.html" style="font-size:15px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);padding:12px 0;border-bottom:1px solid var(--line)">Packages</a>
+          <a href="#" style="font-size:15px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:12px 0;border-bottom:1px solid var(--line)">Shop</a>
+          <a href="#" style="font-size:15px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:12px 0;border-bottom:1px solid var(--line)">Contact</a>
+          <a href="#" style="font-size:15px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;padding:12px 0">Sign In</a>
+        </div>
+        <button onClick="{{ openTrial }}" style="width:100%;background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:15px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer">Book Free Trial</button>
+      </div>
+    </sc-if>
+  </header>
+
+  <section style="border-bottom:1px solid var(--line);background:var(--surface)">
+    <div style="max-width:1320px;margin:0 auto;padding:20px 20px 0;font-size:12px;color:var(--muted)">
+      <a href="Crunch Fitness Home.dc.html" style="color:var(--muted)">/</a> <span style="color:var(--text)">/packages</span>
+    </div>
+    <div style="max-width:1320px;margin:0 auto;padding:40px 20px 52px;animation:fadeUp .7s both">
+      <div style="display:inline-block;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);padding:7px 14px;border-radius:6px;margin-bottom:18px">Memberships</div>
+      <h1 style="font-family:var(--display);font-weight:600;font-size:clamp(34px,5.6vw,68px);line-height:1.03;margin:0 0 16px;text-transform:uppercase;max-width:18ch">One price list. No joining fee.</h1>
+      <p style="font-size:clamp(15px,1.8vw,18px);line-height:1.6;color:var(--muted);max-width:58ch;margin:0">Every plan covers the full floor at <b style="color:var(--text)">{{ locName }}</b>. Pay by UPI, card or netbanking through Razorpay — the GST invoice is emailed the same minute.</p>
+    </div>
+  </section>
+
+  <section style="max-width:1320px;margin:0 auto;padding:56px 20px 0">
+    <div style="display:flex;align-items:end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:24px">
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:10px">Gym access</div>
+        <h2 style="font-family:var(--display);font-weight:600;font-size:clamp(24px,3.4vw,40px);line-height:1.05;margin:0;text-transform:uppercase">Membership packages</h2>
+      </div>
+      <span style="font-size:13px;color:var(--muted)">Prices shown for {{ locShort }}</span>
+    </div>
+    <sc-if value="{{ plansLoading }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px">
+        <sc-for list="{{ skeletons }}" as="s" hint-placeholder-count="4">
+          <div style="border:1px solid var(--line);border-radius:16px;background:var(--surface);padding:28px;animation:shimmer 1.4s ease-in-out infinite">
+            <div style="height:12px;width:45%;background:var(--surface2);border-radius:4px;margin-bottom:20px"></div>
+            <div style="height:36px;width:70%;background:var(--surface2);border-radius:6px;margin-bottom:24px"></div>
+            <div style="height:11px;background:var(--surface2);border-radius:4px;margin-bottom:12px"></div>
+            <div style="height:11px;background:var(--surface2);border-radius:4px;margin-bottom:12px"></div>
+            <div style="height:11px;width:80%;background:var(--surface2);border-radius:4px;margin-bottom:28px"></div>
+            <div style="height:46px;background:var(--surface2);border-radius:999px"></div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ plansEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="border:1px dashed var(--line);border-radius:16px;padding:60px 24px;text-align:center">
+        <div style="font-family:var(--display);font-weight:600;font-size:22px;text-transform:uppercase;margin-bottom:10px">No plans published for this location yet</div>
+        <p style="font-size:14px;color:var(--muted);margin:0 0 20px;max-width:46ch;margin-inline:auto">Membership pricing for {{ locShort }} is being set up. Call the gym and we'll quote you directly.</p>
+        <button onClick="{{ openTrial }}" style="background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:13px 28px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer">Talk to us</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ plansLive }}" hint-placeholder-val="{{ true }}">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:18px;align-items:start">
+        <sc-for list="{{ plans }}" as="p" hint-placeholder-count="5">
+          <div style="border:{{ p.border }};border-radius:16px;background:var(--surface);padding:28px;position:relative;box-shadow:{{ p.shadow }};transition:transform .3s ease" style-hover="transform:translateY(-3px)">
+            <sc-if value="{{ p.featured }}" hint-placeholder-val="{{ false }}">
+              <span style="position:absolute;top:-12px;left:24px;background:var(--accent);color:var(--accent-ink);font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:5px 12px;border-radius:999px">Most Popular</span>
+            </sc-if>
+            <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:{{ p.nameInk }};margin-bottom:14px">{{ p.name }}</div>
+            <div style="display:flex;align-items:baseline;gap:7px;margin-bottom:6px;flex-wrap:wrap">
+              <span style="font-family:var(--display);font-weight:600;font-size:{{ p.priceSize }};line-height:1">{{ p.price }}</span>
+              <span style="font-size:13px;color:var(--muted)">{{ p.interval }}</span>
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:22px;min-height:18px">{{ p.note }}</div>
+            <div style="display:grid;gap:10px;font-size:14px;color:var(--muted);margin-bottom:26px">
+              <sc-for list="{{ p.features }}" as="f" hint-placeholder-count="4">
+                <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--accent);flex-shrink:0">✓</span><span>{{ f.t }}</span></div>
+              </sc-for>
+            </div>
+            <button onClick="{{ p.buy }}" style="width:100%;background:{{ p.btnBg }};border:1px solid {{ p.btnBorder }};color:{{ p.btnInk }};border-radius:999px;padding:14px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:filter .2s ease,border-color .2s ease" style-hover="filter:brightness(1.08);border-color:var(--accent)">{{ p.cta }}</button>
+          </div>
+        </sc-for>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:22px 0 0;text-align:center">GST invoice emailed after purchase · Membership starts the day you first check in · Renew from the Member App in two taps</p>
+    </sc-if>
+  </section>
+
+  <section style="margin-top:76px;background:var(--surface);border-top:1px solid var(--line);border-bottom:1px solid var(--line)">
+    <div style="max-width:1320px;margin:0 auto;padding:56px 20px">
+      <div style="display:flex;align-items:end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:8px">
+        <div>
+          <div style="font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:10px">One-to-one</div>
+          <h2 style="font-family:var(--display);font-weight:600;font-size:clamp(24px,3.4vw,40px);line-height:1.05;margin:0;text-transform:uppercase">Personal training packages</h2>
+        </div>
+        <span style="font-size:13px;color:var(--muted)">Coach assigned after a fitness assessment</span>
+      </div>
+      <p style="font-size:14px;color:var(--muted);margin:0 0 26px;max-width:60ch">Sessions are 60 minutes, booked directly with your coach, and valid for six months from purchase. A gym membership is required alongside any PT block.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:18px;align-items:start">
+        <sc-for list="{{ ptPlans }}" as="p" hint-placeholder-count="4">
+          <div style="border:{{ p.border }};border-radius:16px;background:var(--bg);padding:28px;position:relative;box-shadow:{{ p.shadow }};transition:transform .3s ease" style-hover="transform:translateY(-3px)">
+            <sc-if value="{{ p.featured }}" hint-placeholder-val="{{ false }}">
+              <span style="position:absolute;top:-12px;left:24px;background:var(--accent);color:var(--accent-ink);font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:5px 12px;border-radius:999px">Best value</span>
+            </sc-if>
+            <div style="font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:{{ p.nameInk }};margin-bottom:14px">{{ p.name }}</div>
+            <div style="display:flex;align-items:baseline;gap:7px;margin-bottom:6px;flex-wrap:wrap">
+              <span style="font-family:var(--display);font-weight:600;font-size:{{ p.priceSize }};line-height:1">{{ p.price }}</span>
+              <span style="font-size:13px;color:var(--muted)">{{ p.interval }}</span>
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:22px;min-height:18px">{{ p.note }}</div>
+            <div style="display:grid;gap:10px;font-size:14px;color:var(--muted);margin-bottom:26px">
+              <sc-for list="{{ p.features }}" as="f" hint-placeholder-count="4">
+                <div style="display:flex;gap:9px;align-items:flex-start"><span style="color:var(--accent);flex-shrink:0">✓</span><span>{{ f.t }}</span></div>
+              </sc-for>
+            </div>
+            <button onClick="{{ p.buy }}" style="width:100%;background:{{ p.btnBg }};border:1px solid {{ p.btnBorder }};color:{{ p.btnInk }};border-radius:999px;padding:14px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:filter .2s ease,border-color .2s ease" style-hover="filter:brightness(1.08);border-color:var(--accent)">{{ p.cta }}</button>
+          </div>
+        </sc-for>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:22px 0 0;text-align:center">Cancel or reschedule a session up to 12 hours ahead · Unused sessions expire after six months</p>
+    </div>
+  </section>
+
+  <section style="max-width:1320px;margin:0 auto;padding:56px 20px 0">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:40px">
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:10px">Renewals</div>
+        <h2 style="font-family:var(--display);font-weight:600;font-size:clamp(22px,3vw,34px);line-height:1.06;margin:0 0 14px;text-transform:uppercase">Renewing takes two taps</h2>
+        <p style="font-size:14px;line-height:1.65;color:var(--muted);margin:0 0 14px">We send a WhatsApp reminder seven days before your plan ends with a payment link. Renew before it lapses and you keep your original rate for another term, even if prices have gone up.</p>
+        <p style="font-size:14px;line-height:1.65;color:var(--muted);margin:0">Freeze up to 7 days on Quarterly and 30 days on Annual — for travel, exams or injury. No paperwork, just message the front desk.</p>
+      </div>
+      <div style="display:grid;gap:12px">
+        <sc-for list="{{ faqs }}" as="f" hint-placeholder-count="4">
+          <div style="border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:18px">
+            <div style="font-size:14px;font-weight:700;margin-bottom:7px">{{ f.q }}</div>
+            <div style="font-size:13px;line-height:1.6;color:var(--muted)">{{ f.a }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <sc-if value="{{ buyOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:210;background:rgba(0,0,0,.72);display:grid;place-items:center;padding:20px;overflow:auto">
+      <div style="width:100%;max-width:520px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:28px;position:relative">
+        <button onClick="{{ closeBuy }}" style="position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer">✕</button>
+
+        <sc-if value="{{ buySummary }}" hint-placeholder-val="{{ true }}">
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:8px">Step 1 of 3 · Plan</div>
+            <h3 style="font-family:var(--display);font-weight:600;font-size:26px;margin:0 0 18px;text-transform:uppercase">{{ buyName }}</h3>
+            <div style="border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:18px;display:grid;gap:12px;margin-bottom:20px">
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px"><span style="color:var(--muted)">Plan</span><b>{{ buyName }}</b></div>
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px"><span style="color:var(--muted)">Billing</span><b>{{ buyInterval }}</b></div>
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px"><span style="color:var(--muted)">Location</span><b>{{ locShort }}</b></div>
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px"><span style="color:var(--muted)">Starts</span><b>On your first check-in</b></div>
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:17px;font-weight:700;padding-top:12px;border-top:1px solid var(--line)"><span>Total</span><span>{{ buyPrice }}</span></div>
+            </div>
+            <button onClick="{{ toBuyer }}" style="width:100%;background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:15px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer">Continue</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ buyDetails }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:8px">Step 2 of 3 · Your details</div>
+            <h3 style="font-family:var(--display);font-weight:600;font-size:26px;margin:0 0 6px;text-transform:uppercase">Who is this for?</h3>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 20px">{{ buyName }} · {{ buyPrice }} {{ buyInterval }}</p>
+            <div style="display:grid;gap:12px">
+              <input placeholder="Full name" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 14px;color:var(--text);font-size:14px" style-focus="border-color:var(--accent);outline:none">
+              <input placeholder="+91 XXXXX XXXXX" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 14px;color:var(--text);font-size:14px" style-focus="border-color:var(--accent);outline:none">
+              <input placeholder="Email address (for the GST invoice)" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 14px;color:var(--text);font-size:14px" style-focus="border-color:var(--accent);outline:none">
+              <input placeholder="GSTIN (optional, for company invoices)" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 14px;color:var(--text);font-size:14px" style-focus="border-color:var(--accent);outline:none">
+              <div style="display:flex;gap:10px;margin-top:4px">
+                <button onClick="{{ toSummaryBuy }}" style="flex:0 0 auto;background:transparent;border:1px solid var(--line);border-radius:999px;padding:15px 22px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text);cursor:pointer">Back</button>
+                <button onClick="{{ payPlan }}" style="flex:1 1 auto;background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:15px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer">Pay {{ buyPrice }} with Razorpay</button>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ buyPaying }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center;padding:44px 0">
+            <div style="width:38px;height:38px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);margin:0 auto 18px;animation:spin .8s linear infinite"></div>
+            <div style="font-family:var(--display);font-weight:600;font-size:20px;text-transform:uppercase">Opening Razorpay…</div>
+            <p style="font-size:13px;color:var(--muted);margin:8px 0 0">Do not close this window.</p>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ buyDone }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center;padding:14px 0">
+            <div style="width:56px;height:56px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-size:26px;margin:0 auto 18px">✓</div>
+            <h3 style="font-family:var(--display);font-weight:600;font-size:26px;margin:0 0 8px;text-transform:uppercase">Membership active</h3>
+            <p style="font-size:14px;color:var(--muted);margin:0 0 20px">{{ buyName }} · {{ locShort }} · valid from your first check-in</p>
+            <div style="border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:16px;text-align:left;font-size:13px;line-height:1.6;color:var(--muted);margin-bottom:16px">
+              Order <b style="color:var(--text)">CF-M-2026-1174</b><br>Check WhatsApp for your GST invoice and Member App access. Bring a photo ID on your first visit.
+            </div>
+            <div style="border:1px solid var(--accent);border-radius:12px;background:var(--accent-soft);padding:16px;text-align:left;display:flex;gap:14px;align-items:center;margin-bottom:18px">
+              <span style="font-size:13px;line-height:1.55;flex:1 1 auto"><b>Get the Member App</b><br><span style="color:var(--muted)">Book classes, freeze your plan and renew without calling the desk.</span></span>
+              <a href="#" style="flex:0 0 auto;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);border-bottom:2px solid var(--accent);padding-bottom:2px">Download</a>
+            </div>
+            <button onClick="{{ closeBuy }}" style="width:100%;background:transparent;border:1px solid var(--line);border-radius:999px;padding:14px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text);cursor:pointer">Done</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ buyFailed }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center;padding:14px 0">
+            <div style="width:56px;height:56px;border-radius:50%;border:2px solid var(--accent);color:var(--accent);display:grid;place-items:center;font-size:24px;margin:0 auto 18px">!</div>
+            <h3 style="font-family:var(--display);font-weight:600;font-size:24px;margin:0 0 8px;text-transform:uppercase">Payment failed</h3>
+            <p style="font-size:14px;color:var(--muted);margin:0 0 20px">Razorpay declined the transaction. Nothing has been charged and your plan is not active yet.</p>
+            <div style="display:flex;gap:10px">
+              <button onClick="{{ closeBuy }}" style="flex:0 0 auto;background:transparent;border:1px solid var(--line);border-radius:999px;padding:14px 22px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text);cursor:pointer">Cancel</button>
+              <button onClick="{{ payPlan }}" style="flex:1 1 auto;background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:14px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer">Try payment again</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ buyEnquiry }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:8px">Enquiry</div>
+            <h3 style="font-family:var(--display);font-weight:600;font-size:26px;margin:0 0 6px;text-transform:uppercase">{{ buyName }}</h3>
+            <p style="font-size:14px;color:var(--muted);margin:0 0 20px">Personal training is quoted per person after a short call. Leave your number and a coach will WhatsApp you.</p>
+            <div style="display:grid;gap:12px">
+              <input placeholder="Full name" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 14px;color:var(--text);font-size:14px" style-focus="border-color:var(--accent);outline:none">
+              <input placeholder="+91 XXXXX XXXXX" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 14px;color:var(--text);font-size:14px" style-focus="border-color:var(--accent);outline:none">
+              <textarea placeholder="What are you training for?" rows="3" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 14px;color:var(--text);font-size:14px;resize:vertical" style-focus="border-color:var(--accent);outline:none"></textarea>
+              <button onClick="{{ sendEnquiry }}" style="background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:15px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer">Request a call</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ buyEnquiryDone }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center;padding:26px 0">
+            <div style="width:56px;height:56px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-size:26px;margin:0 auto 18px">✓</div>
+            <h3 style="font-family:var(--display);font-weight:600;font-size:26px;margin:0 0 10px;text-transform:uppercase">Request sent</h3>
+            <p style="font-size:15px;color:var(--muted);margin:0 0 24px">We'll WhatsApp you shortly with trainer availability at {{ locShort }}.</p>
+            <button onClick="{{ closeBuy }}" style="background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:14px 30px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer">Done</button>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <footer style="margin-top:76px;background:var(--surface2);border-top:1px solid var(--line)">
+    <div style="max-width:1320px;margin:0 auto;padding:56px 20px 28px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:34px">
+      <div>
+        <div style="display:flex;align-items:center;gap:9px;margin-bottom:14px">
+          <span style="width:22px;height:22px;background:var(--accent);display:block;transform:skewX(-12deg)"></span>
+          <span style="font-family:var(--display);font-weight:600;font-size:20px;letter-spacing:.06em;text-transform:uppercase">Crunch<span style="color:var(--accent)">.</span></span>
+        </div>
+        <p style="font-size:13px;line-height:1.65;color:var(--muted);margin:0 0 16px;max-width:32ch">An independent Indian gym chain. Not affiliated with any international franchise of a similar name.</p>
+        <div style="display:flex;gap:10px">
+          <a href="#" style="width:38px;height:38px;border:1px solid var(--line);border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:600" style-hover="border-color:var(--accent)">IG</a>
+          <a href="#" style="width:38px;height:38px;border:1px solid var(--line);border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:600" style-hover="border-color:var(--accent)">FB</a>
+          <a href="#" style="width:38px;height:38px;border:1px solid var(--line);border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:600" style-hover="border-color:var(--accent)">WA</a>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:14px">Vasant Kunj</div>
+        <p style="font-size:13px;line-height:1.7;color:var(--muted);margin:0">Plot 4, Community Centre,<br>Vasant Kunj, New Delhi 110070<br>+91 98110 24680<br>vasantkunj@crunchfitness.in<br>Mon–Sun · 05:30 – 22:30</p>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:14px">Gurgaon</div>
+        <p style="font-size:13px;line-height:1.7;color:var(--muted);margin:0">SCO 12, Leisure Valley Road,<br>Sector 29, Gurgaon, Haryana 122002<br>+91 98722 13570<br>gurgaon@crunchfitness.in<br>Mon–Sun · 06:00 – 22:00</p>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:14px">Company</div>
+        <div style="display:grid;gap:9px;font-size:13px">
+          <a href="Crunch Fitness About.dc.html">About</a><a href="Crunch Fitness Classes.dc.html">Classes</a><a href="Crunch Fitness Packages.dc.html">Packages</a><a href="#">Shop</a><a href="#">Contact</a>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:14px">Policies</div>
+        <div style="display:grid;gap:9px;font-size:13px">
+          <a href="#">Refund Policy</a><a href="#">Gym Guidelines &amp; Etiquette</a><a href="#">Terms of Use</a><a href="#">Privacy Policy</a>
+        </div>
+      </div>
+    </div>
+    <div style="max-width:1320px;margin:0 auto;padding:18px 20px 40px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;font-size:12px;color:var(--muted)">
+      <span>© 2026 Crunch Fitness. GST-registered · GSTIN 07AABCU9603R1ZX</span>
+      <span>Payments by Razorpay · Shipping by Shiprocket</span>
+    </div>
+  </footer>
+
+  <div style="position:fixed;bottom:0;left:0;right:0;z-index:70;background:var(--surface);border-top:1px solid var(--line);padding:10px 16px;display:flex;align-items:center;gap:12px">
+    <span style="flex:1 1 auto;min-width:0;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ locShort }} · plans from ₹2,500/month</span>
+    <button onClick="{{ openTrial }}" style="flex:0 0 auto;background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:13px 24px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer">Book Free Trial</button>
+  </div>
+
+  <sc-if value="{{ bookOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:210;background:rgba(0,0,0,.72);display:grid;place-items:center;padding:20px;overflow:auto">
+      <div style="width:100%;max-width:520px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:28px;position:relative">
+        <button onClick="{{ closeBook }}" style="position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer">✕</button>
+
+        <sc-if value="{{ stepSummary }}" hint-placeholder-val="{{ true }}">
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:8px">Step 1 of 3 · Slot</div>
+            <h3 style="font-family:var(--display);font-weight:600;font-size:26px;margin:0 0 18px;text-transform:uppercase">{{ bkName }}</h3>
+            <div style="border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:18px;display:grid;gap:12px;margin-bottom:20px">
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px"><span style="color:var(--muted)">When</span><b>{{ bkWhen }}</b></div>
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px"><span style="color:var(--muted)">Duration</span><b>{{ bkDur }}</b></div>
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px"><span style="color:var(--muted)">Instructor</span><b>{{ bkInst }}</b></div>
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px"><span style="color:var(--muted)">Location</span><b>{{ locShort }}</b></div>
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px"><span style="color:var(--muted)">Spots</span><b style="color:var(--accent)">{{ bkSpots }}</b></div>
+            </div>
+            <button onClick="{{ toDetails }}" style="width:100%;background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:15px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer">Continue</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ stepDetails }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:8px">Step 2 of 3 · Your details</div>
+            <h3 style="font-family:var(--display);font-weight:600;font-size:26px;margin:0 0 6px;text-transform:uppercase">Who's attending?</h3>
+            <p style="font-size:13px;color:var(--muted);margin:0 0 20px">{{ bkName }} · {{ bkWhen }}</p>
+            <div style="display:grid;gap:12px">
+              <input placeholder="Full name" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 14px;color:var(--text);font-size:14px" style-focus="border-color:var(--accent);outline:none">
+              <input placeholder="+91 XXXXX XXXXX" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 14px;color:var(--text);font-size:14px" style-focus="border-color:var(--accent);outline:none">
+              <input placeholder="Email address" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 14px;color:var(--text);font-size:14px" style-focus="border-color:var(--accent);outline:none">
+              <div style="display:flex;gap:10px;margin-top:4px">
+                <button onClick="{{ toSummary }}" style="flex:0 0 auto;background:transparent;border:1px solid var(--line);border-radius:999px;padding:15px 22px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text);cursor:pointer">Back</button>
+                <button onClick="{{ toPay }}" style="flex:1 1 auto;background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:15px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer">Continue to payment</button>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ stepPay }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:8px">Step 3 of 3 · Payment</div>
+            <h3 style="font-family:var(--display);font-weight:600;font-size:26px;margin:0 0 18px;text-transform:uppercase">Confirm and pay</h3>
+            <div style="border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:18px;display:grid;gap:11px;margin-bottom:16px">
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px"><span style="color:var(--muted)">{{ bkName }}</span><span>{{ bkPriceBase }}</span></div>
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:14px"><span style="color:var(--muted)">GST (18%)</span><span>{{ bkPriceGst }}</span></div>
+              <div style="display:flex;justify-content:space-between;gap:12px;font-size:17px;font-weight:700;padding-top:11px;border-top:1px solid var(--line)"><span>Total</span><span>{{ bkPrice }}</span></div>
+            </div>
+            <p style="font-size:12px;color:var(--muted);margin:0 0 18px">Paid securely via Razorpay. GST invoice emailed after payment. Cancel up to 4 hours before the class for a full refund.</p>
+            <div style="display:flex;gap:10px">
+              <button onClick="{{ toDetails }}" style="flex:0 0 auto;background:transparent;border:1px solid var(--line);border-radius:999px;padding:15px 22px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text);cursor:pointer">Back</button>
+              <button onClick="{{ pay }}" style="flex:1 1 auto;background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:15px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer">Pay {{ bkPrice }} &amp; book</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ stepPaying }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center;padding:44px 0">
+            <div style="width:38px;height:38px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);margin:0 auto 18px;animation:spin .8s linear infinite"></div>
+            <div style="font-family:var(--display);font-weight:600;font-size:20px;text-transform:uppercase">Opening Razorpay…</div>
+            <p style="font-size:13px;color:var(--muted);margin:8px 0 0">Do not close this window.</p>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ stepDone }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center;padding:14px 0">
+            <div style="width:56px;height:56px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-size:26px;margin:0 auto 18px">✓</div>
+            <h3 style="font-family:var(--display);font-weight:600;font-size:26px;margin:0 0 8px;text-transform:uppercase">Booking confirmed</h3>
+            <p style="font-size:14px;color:var(--muted);margin:0 0 20px">{{ bkName }} · {{ bkWhen }} · {{ locShort }}</p>
+            <div style="border:1px solid var(--line);border-radius:12px;background:var(--bg);padding:16px;text-align:left;font-size:13px;line-height:1.6;color:var(--muted);margin-bottom:16px">
+              Booking ID <b style="color:var(--text)">CF-2026-40188</b><br>Confirmation and GST invoice sent to WhatsApp. Arrive ten minutes early and check in at the desk.
+            </div>
+            <div style="border:1px solid var(--accent);border-radius:12px;background:var(--accent-soft);padding:16px;text-align:left;display:flex;gap:14px;align-items:center;margin-bottom:18px">
+              <span style="font-size:13px;line-height:1.55;flex:1 1 auto"><b>Get the Member App</b><br><span style="color:var(--muted)">Manage bookings, cancel slots and renew your membership.</span></span>
+              <a href="#" style="flex:0 0 auto;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);border-bottom:2px solid var(--accent);padding-bottom:2px">Download</a>
+            </div>
+            <button onClick="{{ closeBook }}" style="width:100%;background:transparent;border:1px solid var(--line);border-radius:999px;padding:14px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text);cursor:pointer">Done</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ stepFull }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center;padding:14px 0">
+            <div style="width:56px;height:56px;border-radius:50%;border:2px solid var(--line);color:var(--muted);display:grid;place-items:center;font-size:24px;margin:0 auto 18px">✕</div>
+            <h3 style="font-family:var(--display);font-weight:600;font-size:24px;margin:0 0 8px;text-transform:uppercase">That slot just filled</h3>
+            <p style="font-size:14px;color:var(--muted);margin:0 0 22px">{{ bkName }} at {{ bkWhen }} reached its cap of twenty while you were booking. Nothing has been charged.</p>
+            <button onClick="{{ closeBook }}" style="width:100%;background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:14px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;margin-bottom:10px">See other slots</button>
+            <button onClick="{{ closeBook }}" style="width:100%;background:transparent;border:1px solid var(--line);border-radius:999px;padding:14px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text);cursor:pointer">Join the waitlist</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ stepFailed }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center;padding:14px 0">
+            <div style="width:56px;height:56px;border-radius:50%;border:2px solid var(--accent);color:var(--accent);display:grid;place-items:center;font-size:24px;margin:0 auto 18px">!</div>
+            <h3 style="font-family:var(--display);font-weight:600;font-size:24px;margin:0 0 8px;text-transform:uppercase">Payment failed</h3>
+            <p style="font-size:14px;color:var(--muted);margin:0 0 20px">Razorpay declined the transaction and your slot is held for 10 more minutes. No money has left your account.</p>
+            <div style="display:flex;gap:10px">
+              <button onClick="{{ closeBook }}" style="flex:0 0 auto;background:transparent;border:1px solid var(--line);border-radius:999px;padding:14px 22px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text);cursor:pointer">Cancel</button>
+              <button onClick="{{ toPay }}" style="flex:1 1 auto;background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:14px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer">Try payment again</button>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ trialOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.72);display:grid;place-items:center;padding:20px;overflow:auto">
+      <div style="width:100%;max-width:520px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:30px;position:relative">
+        <button onClick="{{ closeTrial }}" style="position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer">✕</button>
+        <sc-if value="{{ trialDone }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center;padding:26px 0">
+            <div style="width:56px;height:56px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-size:26px;margin:0 auto 18px">✓</div>
+            <h3 style="font-family:var(--display);font-weight:600;font-size:26px;margin:0 0 10px;text-transform:uppercase">You're on the list</h3>
+            <p style="font-size:15px;color:var(--muted);margin:0 0 24px">We'll WhatsApp you shortly to confirm your slot at {{ locName }}.</p>
+            <button onClick="{{ closeTrial }}" style="background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:14px 30px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer">Done</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ trialForm }}" hint-placeholder-val="{{ true }}">
+          <div>
+            <div style="font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:8px">Free trial</div>
+            <h3 style="font-family:var(--display);font-weight:600;font-size:28px;margin:0 0 6px;text-transform:uppercase">Book your session</h3>
+            <p style="font-size:14px;color:var(--muted);margin:0 0 22px">One session, no charge. We'll confirm on WhatsApp.</p>
+            <div style="display:grid;gap:12px">
+              <input placeholder="Full name" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 14px;color:var(--text);font-size:14px" style-focus="border-color:var(--accent);outline:none">
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px">
+                <input placeholder="+91 XXXXX XXXXX" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 14px;color:var(--text);font-size:14px" style-focus="border-color:var(--accent);outline:none">
+                <input placeholder="Email address" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 14px;color:var(--text);font-size:14px" style-focus="border-color:var(--accent);outline:none">
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px">
+                <select style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 14px;color:var(--text);font-size:14px">
+                  <option>Group Classes</option><option>Gym Membership</option><option>Personal Training</option>
+                </select>
+                <select style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 14px;color:var(--text);font-size:14px">
+                  <option>Crunch Fitness, Vasant Kunj</option><option>Crunch Fitness, Gurgaon</option>
+                </select>
+              </div>
+              <textarea placeholder="Anything we should know? (optional)" rows="3" style="width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:13px 14px;color:var(--text);font-size:14px;resize:vertical" style-focus="border-color:var(--accent);outline:none"></textarea>
+              <button onClick="{{ submitTrial }}" style="background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:15px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer" style-hover="filter:brightness(1.08)">Book Free Trial</button>
+              <p style="font-size:11px;color:var(--muted);text-align:center;margin:0">By submitting you agree to be contacted on WhatsApp. See our <a href="#" style="border-bottom:1px solid var(--line)">Privacy Policy</a>.</p>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </sc-if>
+</div>
+
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;,&quot;section&quot;:&quot;Brand&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;options&quot;:[&quot;#FF3D14&quot;,&quot;#D2532B&quot;,&quot;#B8452A&quot;,&quot;#3F6B5C&quot;],&quot;default&quot;:&quot;#FF3D14&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Brand&quot;},&quot;defaultLocation&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;vk&quot;,&quot;gg&quot;],&quot;default&quot;:&quot;vk&quot;,&quot;tsType&quot;:&quot;'vk'|'gg'&quot;,&quot;section&quot;:&quot;Content&quot;},&quot;plansState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;live&quot;,&quot;loading&quot;,&quot;empty&quot;],&quot;default&quot;:&quot;live&quot;,&quot;tsType&quot;:&quot;'live'|'loading'|'empty'&quot;,&quot;section&quot;:&quot;Data states&quot;},&quot;paymentOutcome&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;success&quot;,&quot;failed&quot;],&quot;default&quot;:&quot;success&quot;,&quot;tsType&quot;:&quot;'success'|'failed'&quot;,&quot;section&quot;:&quot;Data states&quot;}}">
+const PLANS = [
+  { id:'day', name:'Day Pass', price:'₹300', interval:'per visit', note:'Walk in, train, leave.', featured:false,
+    features:['Full gym floor for one day','Locker & shower','Valid at one location'] },
+  { id:'month', name:'Monthly', price:'₹2,500', interval:'per month', note:'Rolling — cancel any time.', featured:false,
+    features:['Full gym floor access','2 group classes a week','Locker & shower','Member App access'] },
+  { id:'quarter', name:'Quarterly', price:'₹6,500', interval:'per quarter', note:'Works out to ₹2,167 a month.', featured:false,
+    features:['Full gym floor access','Unlimited group classes','1 body composition check','Freeze up to 7 days'] },
+  { id:'annual', name:'Annual', price:'₹24,000', interval:'per year', note:'Works out to ₹2,000 a month.', featured:true,
+    features:['Everything in Quarterly','2 personal training sessions','Guest pass every quarter','Freeze up to 30 days'] },
+];
+const PT_PLANS = [
+  { id:'pt-trial', name:'Single Session', price:'₹800', interval:'per session', note:'Try a coach before committing.', featured:false,
+    features:['One 60-minute session','Movement assessment','Written notes after the session'] },
+  { id:'pt-8', name:'8 Sessions', price:'₹6,000', interval:'per block', note:'₹750 a session.', featured:false,
+    features:['Eight 60-minute sessions','Programme written for you','Form video review','Valid six months'] },
+  { id:'pt-12', name:'12 Sessions', price:'₹8,400', interval:'per block', note:'₹700 a session.', featured:true,
+    features:['Twelve 60-minute sessions','Programme + nutrition guidance','Monthly body composition check','Valid six months'] },
+  { id:'pt-couple', name:'Partner Training', price:null, interval:'', note:'Quoted after a short call.', featured:false,
+    features:['Two people, one coach','Sessions split as you like','Suited to couples and siblings','Quoted per pair'] }
+];
+const FAQS = [
+  ['Is there a joining fee?','No. The price you see is the price you pay, GST included.'],
+  ['Can I use both locations?','Annual members can. Monthly and Quarterly are tied to the location you sign up at.'],
+  ['What if I want to stop?','Monthly is rolling — skip the next payment and it lapses. Longer plans follow the refund policy.'],
+  ['Do you take UPI?','Yes. UPI, cards and netbanking, all through Razorpay.']
+];
+
+class Component extends DCLogic {
+  state = { theme:null, loc:null, wide:true, menuOpen:false, locMenuOpen:false, trialOpen:false, trialDone:false, loading:true, buy:null, step:'summary' };
+
+  componentDidMount(){
+    this.mq = window.matchMedia('(min-width: 1220px)');
+    this.onMQ = () => this.setState({ wide:this.mq.matches, menuOpen:false, locMenuOpen:false });
+    this.mq.addEventListener('change', this.onMQ);
+    this.setState({ theme:this.props.theme||'light', loc:this.props.defaultLocation||'vk', wide:this.mq.matches });
+    this.applyTokens(this.props.theme||'light');
+    this.load();
+  }
+  componentDidUpdate(prev){
+    if (prev.theme !== this.props.theme && this.props.theme) this.setState({ theme:this.props.theme });
+    if (prev.theme !== this.props.theme || prev.accent !== this.props.accent) this.applyTokens(this.props.theme || this.state.theme || 'light');
+  }
+  componentWillUnmount(){ if(this.mq) this.mq.removeEventListener('change', this.onMQ); clearTimeout(this.t); clearTimeout(this.p); }
+  applyTokens(t){
+    const el = document.documentElement;
+    if (t === 'dark') el.setAttribute('data-theme','dark'); else el.removeAttribute('data-theme');
+    if (this.props.accent) el.style.setProperty('--accent', this.props.accent);
+  }
+  load(){ clearTimeout(this.t); this.setState({ loading:true }); this.t = setTimeout(()=>this.setState({loading:false}), 900); }
+
+  renderVals(){
+    const theme = this.state.theme || this.props.theme || 'light';
+    const loc = this.state.loc || this.props.defaultLocation || 'vk';
+    const isVK = loc === 'vk';
+    const forced = this.props.plansState || 'live';
+    const loading = forced === 'loading' || (forced === 'live' && this.state.loading);
+    const empty = forced === 'empty';
+    const bu = this.state.buy || {};
+    const step = this.state.step;
+
+    return {
+      themeIcon: theme === 'light' ? '☾' : '☀',
+      toggleTheme: () => { const n = theme === 'light' ? 'dark' : 'light'; this.setState({theme:n}); this.applyTokens(n); },
+      isWide: this.state.wide, isNarrow: !this.state.wide,
+      menuOpen: this.state.menuOpen && !this.state.wide,
+      toggleMenu: () => this.setState(s => ({ menuOpen:!s.menuOpen, locMenuOpen:false })),
+      locMenuOpen: this.state.locMenuOpen,
+      toggleLocMenu: () => this.setState(s => ({ locMenuOpen:!s.locMenuOpen })),
+      locName: isVK ? 'Crunch Fitness, Vasant Kunj' : 'Crunch Fitness, Gurgaon',
+      locShort: isVK ? 'Vasant Kunj' : 'Gurgaon',
+      pickVK: () => { this.setState({ loc:'vk', locMenuOpen:false }); this.load(); },
+      pickGG: () => { this.setState({ loc:'gg', locMenuOpen:false }); this.load(); },
+      vkTick: isVK ? '✓' : '', ggTick: isVK ? '' : '✓',
+      vkRowBg: isVK ? 'var(--accent-soft)' : 'transparent',
+      ggRowBg: isVK ? 'transparent' : 'var(--accent-soft)',
+
+      plansLoading: loading,
+      plansEmpty: !loading && empty,
+      plansLive: !loading && !empty,
+      skeletons: [1,2,3,4].map(i => ({ i })),
+      plans: PLANS.map(p => ({
+        name: p.name,
+        featured: p.featured,
+        price: p.price || 'Contact us',
+        priceSize: p.price ? '38px' : '26px',
+        interval: p.price ? p.interval : '',
+        note: p.note,
+        features: p.features.map(t => ({ t })),
+        nameInk: p.featured ? 'var(--accent)' : 'var(--muted)',
+        border: p.featured ? '2px solid var(--accent)' : '1px solid var(--line)',
+        shadow: p.featured ? '0 18px 50px rgba(0,0,0,.16)' : 'none',
+        btnBg: p.featured ? 'var(--accent)' : 'transparent',
+        btnBorder: p.featured ? 'var(--accent)' : 'var(--line)',
+        btnInk: p.featured ? 'var(--accent-ink)' : 'var(--text)',
+        cta: p.price ? 'Choose ' + p.name : 'Contact us',
+        buy: () => this.setState({ buy: p, step: p.price ? 'summary' : 'enquiry' })
+      })),
+      ptPlans: PT_PLANS.map(p => ({
+        name: p.name,
+        featured: p.featured,
+        price: p.price || 'Contact us',
+        priceSize: p.price ? '38px' : '26px',
+        interval: p.price ? p.interval : '',
+        note: p.note,
+        features: p.features.map(t => ({ t })),
+        nameInk: p.featured ? 'var(--accent)' : 'var(--muted)',
+        border: p.featured ? '2px solid var(--accent)' : '1px solid var(--line)',
+        shadow: p.featured ? '0 18px 50px rgba(0,0,0,.16)' : 'none',
+        btnBg: p.featured ? 'var(--accent)' : 'transparent',
+        btnBorder: p.featured ? 'var(--accent)' : 'var(--line)',
+        btnInk: p.featured ? 'var(--accent-ink)' : 'var(--text)',
+        cta: p.price ? 'Buy ' + p.name : 'Contact us',
+        buy: () => this.setState({ buy: p, step: p.price ? 'summary' : 'enquiry' })
+      })),
+      faqs: FAQS.map(f => ({ q:f[0], a:f[1] })),
+
+      buyOpen: !!this.state.buy,
+      closeBuy: () => this.setState({ buy:null, step:'summary' }),
+      buySummary: step === 'summary', buyDetails: step === 'details', buyPaying: step === 'paying',
+      buyDone: step === 'done', buyFailed: step === 'failed', buyEnquiry: step === 'enquiry', buyEnquiryDone: step === 'enquiryDone',
+      toSummaryBuy: () => this.setState({ step:'summary' }),
+      toBuyer: () => this.setState({ step:'details' }),
+      sendEnquiry: () => this.setState({ step:'enquiryDone' }),
+      payPlan: () => {
+        this.setState({ step:'paying' });
+        clearTimeout(this.p);
+        this.p = setTimeout(() => this.setState({ step: this.props.paymentOutcome === 'failed' ? 'failed' : 'done' }), 1400);
+      },
+      buyName: bu.name || '',
+      buyPrice: bu.price || '—',
+      buyInterval: bu.interval || '',
+
+      trialOpen: this.state.trialOpen,
+      trialForm: this.state.trialOpen && !this.state.trialDone,
+      trialDone: this.state.trialDone,
+      openTrial: () => this.setState({ trialOpen:true, trialDone:false, menuOpen:false, locMenuOpen:false }),
+      closeTrial: () => this.setState({ trialOpen:false, trialDone:false }),
+      submitTrial: () => this.setState({ trialDone:true }),
+
+      imgFallback: (e) => {
+        const img = e.target;
+        if (img.dataset.fb) return;
+        img.dataset.fb = '1';
+        img.src = 'https://picsum.photos/seed/' + encodeURIComponent((img.alt||'gym')+'-crunch') + '/900/900';
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

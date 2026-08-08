@@ -1,0 +1,78 @@
+{
+  "$comment": [
+    "THE canonical location data for crunchfitness.in.",
+    "",
+    "This file is the ONLY place in the repository where a gym's name, address,",
+    "phone number or hours is written down. supabase/seed.sql is generated from",
+    "it (npm run seed:generate) and the app falls back to it only when Supabase",
+    "credentials are absent, so a developer can still boot the site locally.",
+    "",
+    "Adding Faridkot later = add an object to `locations`, regenerate seed.sql,",
+    "insert the row, and set mgd_location_id once the branch exists in",
+    "MyGymDesk. No component changes."
+  ],
+  "locations": [
+    {
+      "slug": "vasant-kunj",
+      "name": "Crunch Fitness, Vasant Kunj",
+      "short_name": "Vasant Kunj",
+      "address_line1": "Plot 4, Community Centre",
+      "address_line2": "Vasant Kunj",
+      "city": "New Delhi",
+      "state": "Delhi",
+      "postal_code": "110070",
+      "transit_note": "5 min from Vasant Vihar metro · parking on site",
+      "phone": "+919811024680",
+      "whatsapp": "+919811024680",
+      "email": "vasantkunj@crunchfitness.in",
+      "hours_summary": "Mon–Sun · 05:30 – 22:30",
+      "hours": [
+        { "label": "Monday – Friday", "value": "05:30 – 22:30" },
+        { "label": "Saturday", "value": "06:00 – 21:00" },
+        { "label": "Sunday", "value": "07:00 – 14:00" }
+      ],
+      "closed_note": "Closed on Holi, Diwali and Independence Day.",
+      "map_embed_url": null,
+      "map_link_url": null,
+      "latitude": null,
+      "longitude": null,
+      "socials": {},
+      "mgd_location_id": null,
+      "is_active": true,
+      "is_default": true,
+      "display_order": 1,
+      "hero_image_url": null
+    },
+    {
+      "slug": "gurgaon",
+      "name": "Crunch Fitness, Gurgaon",
+      "short_name": "Gurgaon",
+      "address_line1": "SCO 12, Leisure Valley Road",
+      "address_line2": "Sector 29",
+      "city": "Gurgaon",
+      "state": "Haryana",
+      "postal_code": "122002",
+      "transit_note": "3 min from IFFCO Chowk metro · basement parking",
+      "phone": "+919872213570",
+      "whatsapp": "+919872213570",
+      "email": "gurgaon@crunchfitness.in",
+      "hours_summary": "Mon–Sun · 06:00 – 22:00",
+      "hours": [
+        { "label": "Monday – Friday", "value": "06:00 – 22:00" },
+        { "label": "Saturday", "value": "06:00 – 21:00" },
+        { "label": "Sunday", "value": "07:00 – 13:00" }
+      ],
+      "closed_note": "Closed on Holi, Diwali and Independence Day.",
+      "map_embed_url": null,
+      "map_link_url": null,
+      "latitude": null,
+      "longitude": null,
+      "socials": {},
+      "mgd_location_id": null,
+      "is_active": true,
+      "is_default": false,
+      "display_order": 2,
+      "hero_image_url": null
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { Suspense } from "react";
+
+import { ShopBrowser, ShopSkeleton } from "@/components/shop/ShopBrowser";
+import { PageHero } from "@/components/site/PageHero";
+import { Container } from "@/components/ui/Primitives";
+import { getProducts } from "@/lib/content";
+import { SHIPPING_FLAT_RATE } from "@/lib/fixtures/products";
+import { formatINR } from "@/lib/format";
+import { LOCATION_STORAGE_KEY } from "@/lib/site";
+import { resolveLocation } from "@/lib/site-settings";
+import type { SiteLocation } from "@/lib/supabase/types";
+
+export const metadata: Metadata = {
+  title: "Shop",
+  description:
+    "Supplements, apparel and training gear stocked at Crunch Fitness. Collect at the desk or have it shipped anywhere in India via Shiprocket.",
+  alternates: { canonical: "/shop" },
+};
+
+export const revalidate = 900;
+
+export default async function ShopPage() {
+  const cookieStore = await cookies();
+  const location = await resolveLocation(
+    cookieStore.get(LOCATION_STORAGE_KEY)?.value,
+  );
+
+  return (
+    <>
+      <PageHero
+        eyebrow="Shop"
+        title="The counter, online"
+        breadcrumb="/shop"
+        intro={
+          <>
+            Supplements, apparel and training gear stocked at the gym. Stock
+            shown for <b className="text-text">{location.name}</b> — pick up at
+            the desk or have it shipped.
+          </>
+        }
+      />
+
+      <Container className="pt-8">
+        <Suspense fallback={<ShopSkeleton />}>
+          <Catalog location={location} />
+        </Suspense>
+      </Container>
+
+      <Container className="pt-14">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-4">
+          <InfoCard title="Pickup at the gym">
+            Order online, collect at the desk within 24 hours. No delivery
+            charge.
+          </InfoCard>
+          <InfoCard title="Shipped via Shiprocket">
+            {formatINR(SHIPPING_FLAT_RATE)} flat across India, 3–5 working days.
+            Tracking link sent on WhatsApp.
+          </InfoCard>
+          <InfoCard title="Genuine stock only">
+            Sourced from authorised distributors. Sealed tubs, scannable
+            authenticity codes.
+          </InfoCard>
+        </div>
+      </Container>
+    </>
+  );
+}
+
+async function Catalog({ location }: { location: SiteLocation }) {
+  const { products } = await getProducts(location);
+  return <ShopBrowser products={products} />;
+}
+
+function InfoCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-[12px] border border-line bg-surface p-5">
+      <div className="mb-1.5 font-display text-[16px] font-semibold uppercase">
+        {title}
+      </div>
+      <p className="m-0 text-[13px] leading-[1.6] text-muted">{children}</p>
+    </div>
+  );
+}

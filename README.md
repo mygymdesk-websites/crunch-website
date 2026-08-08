@@ -1,36 +1,91 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# crunchfitness.in
 
-## Getting Started
+Website rebuild for Crunch Fitness — an independent Indian gym chain with two
+locations. Next.js (App Router) on Vercel, the client's own Supabase project for
+website data, and the MyGymDesk Website API for everything gym-side.
 
-First, run the development server:
+**Phase 1 (Foundations) is what is in here.** See [HANDOFF.md](./HANDOFF.md) for
+what is done, what is waiting on credentials, and the Phase 2 checklist.
+
+---
+
+## Run it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local     # fill in what you have; the site boots without any of it
+npm run dev                    # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+With no credentials the site still builds and renders: locations fall back to
+the checked-in seed, and gym data comes from typed fixtures shaped exactly like
+the MyGymDesk API responses.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | What it does |
+|---|---|
+| `npm run dev` | Dev server |
+| `npm run build` | Production build |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run test` | Unit tests (MyGymDesk client, no network needed) |
+| `npm run lint` | ESLint |
+| `npm run seed:generate` | Regenerate `supabase/seed.sql` from the location seed |
+| `npm run check:locations` | Fail if a location name leaked into code |
+| `npm run check:mgd-key` | Fail if the MGD key could reach the browser |
+| `npm run verify` | All of the above, in order |
 
-## Learn More
+## How it is put together
 
-To learn more about Next.js, take a look at the following resources:
+```
+src/
+  app/
+    (site)/          public site — its own root layout, header/footer/cart/trial modal
+    (admin)/admin/   admin panel — separate root layout, no marketing chrome
+    api/enquiries/   lead capture (server-side write, service role)
+  components/        UI primitives + per-page components
+  lib/
+    mgd/             typed MyGymDesk Website API client (server-only)
+    supabase/        browser / server / service-role clients
+    fixtures/        placeholder data, shaped like the real API responses
+    content.ts       ← the Phase 2 swap point: fixtures today, MGD tomorrow
+    site-settings.ts location registry (server-only)
+supabase/
+  migrations/        schema, RLS + explicit GRANTs
+  seed/              THE canonical location data
+  seed.sql           generated from the above
+design-export/       verbatim Claude Design export, for diffing the port
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Three rules the code holds to
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Locations are data.** Nothing in `src/` knows where the gyms are — it knows
+there are rows in `site_settings`. Adding a third gym is an INSERT plus a
+MyGymDesk branch id. `npm run check:locations` fails the build if a location
+name, address or phone appears anywhere outside the seed.
 
-## Deploy on Vercel
+**The MyGymDesk key never reaches the browser.** `lib/mgd/` is `server-only`,
+the key is read from `MGD_API_KEY`, and it goes out in an `x-mgd-api-key`
+header — never a query string. `npm run check:mgd-key` enforces it.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**Display reads are cached.** Every MyGymDesk endpoint shares ONE hourly budget
+per key, so public traffic is served from a 15-minute server cache rather than
+mapped 1:1 onto API calls. The one exception is a timetable read taken
+immediately before a booking, which must be fresh — a session `id` is the next
+real occurrence and rolls forward as occurrences pass.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Database
+
+Migrations are in `supabase/migrations/`, applied in filename order. Every table
+has RLS **and** explicit table-level GRANTs — RLS without GRANTs fails silently,
+because the role never gets a privilege on the relation for the policy to
+filter.
+
+```bash
+supabase link --project-ref <ref>
+supabase db push
+psql "$DATABASE_URL" -f supabase/seed.sql
+```
+
+Then create the first admin: see the commented block at the bottom of
+`supabase/seed.sql`.

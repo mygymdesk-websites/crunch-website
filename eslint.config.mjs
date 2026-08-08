@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Verbatim copy of the Claude Design export, kept for provenance so the
+    // port can be diffed against its source. Not built, not imported, and not
+    // ours to lint.
+    "design-export/**",
   ]),
 ]);
 
