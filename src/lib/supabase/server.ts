@@ -46,11 +46,32 @@ export async function getServerSupabase(): Promise<SupabaseClient | null> {
  *
  * Cheaper than the cookie-bound client and, more importantly, cacheable —
  * nothing about the response varies per visitor.
+ *
+ * `cache` puts the underlying REST call into Next's data cache. That matters
+ * more than it looks: the location read runs on EVERY page render (header,
+ * footer, metadata), and the database is in Mumbai while the function may run
+ * elsewhere, so an uncached read is a cross-region round trip on every single
+ * request. Cached, almost every request does no database work at all.
+ *
+ * Invalidated by tag when an admin saves site settings, so it is never stale
+ * in a way anyone notices.
  */
-export function getPublicSupabase(): SupabaseClient | null {
+export function getPublicSupabase(
+  cache?: { revalidate: number; tags: string[] },
+): SupabaseClient | null {
   if (!isSupabaseConfigured()) return null;
+
   return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: cache
+      ? {
+          fetch: (input, init) =>
+            fetch(input as RequestInfo, {
+              ...init,
+              next: { revalidate: cache.revalidate, tags: cache.tags },
+            } as RequestInit),
+        }
+      : undefined,
   });
 }
 

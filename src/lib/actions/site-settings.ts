@@ -1,8 +1,9 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 
 import { canEditSettings, getAdminGate } from "@/lib/admin-auth";
+import { SITE_SETTINGS_TAG } from "@/lib/site-settings";
 import { getServerSupabase } from "@/lib/supabase/server";
 import type { OpeningHoursRow } from "@/lib/supabase/types";
 
@@ -124,6 +125,12 @@ export async function updateLocation(
   }
 
   // Locations feed the header, footer and every location-aware surface.
+  // `updateTag` rather than `revalidateTag`: this is a Server Action, and the
+  // admin must see their own save reflected on the very next render, not on the
+  // one after. The tag drops the cross-request data cache; the path drops the
+  // rendered pages. Both are needed — without the tag the pages would
+  // re-render against a cached copy of the old row.
+  updateTag(SITE_SETTINGS_TAG);
   revalidatePath("/", "layout");
 
   return { ok: true, message: "Saved." };

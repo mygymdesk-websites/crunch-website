@@ -13,8 +13,8 @@
  *     server-side error to notice. Every Supabase call must go through the
  *     client's Cloudflare-proxied custom domain (e.g. db.crunchfitness.in).
  *
- *     Local dev can opt out with ALLOW_RAW_SUPABASE_URL=true, which is loud
- *     rather than silent, and never applies to a production build.
+ *     There is deliberately no escape hatch: a hatch that exists in dev is a
+ *     hatch that eventually ships.
  *
  *  2. A server-only secret exposed through a NEXT_PUBLIC_* variable.
  *
@@ -65,10 +65,6 @@ const env = loadEnv();
 const errors = [];
 const warnings = [];
 
-const isProductionBuild =
-  env.VERCEL_ENV === "production" ||
-  (env.NODE_ENV === "production" && env.VERCEL_ENV !== "preview");
-
 // ---------------------------------------------------------------------------
 // 1. Supabase URL must not be a raw *.supabase.co host
 // ---------------------------------------------------------------------------
@@ -85,23 +81,13 @@ if (supabaseUrl) {
   }
 
   if (host && /\.supabase\.(co|in)$/i.test(host)) {
-    const message =
+    errors.push(
       `NEXT_PUBLIC_SUPABASE_URL points at the raw Supabase host "${host}".\n` +
-      `    Raw *.supabase.co domains are blocked by several Indian ISPs, and\n` +
-      `    Supabase runs in the VISITOR'S browser here (sign-in, admin, My Orders),\n` +
-      `    so this breaks for real customers with no server-side error to notice.\n` +
-      `    Use the Cloudflare-proxied custom domain instead, e.g. https://db.crunchfitness.in`;
-
-    if (env.ALLOW_RAW_SUPABASE_URL === "true" && !isProductionBuild) {
-      warnings.push(
-        `${message}\n    (allowed for local dev via ALLOW_RAW_SUPABASE_URL=true — ` +
-          `this is a GO-LIVE BLOCKER, see HANDOFF.md)`,
-      );
-    } else {
-      errors.push(
-        `${message}\n    For local dev only, set ALLOW_RAW_SUPABASE_URL=true in .env.local.`,
-      );
-    }
+        `    Raw *.supabase.co domains are blocked by several Indian ISPs, and\n` +
+        `    Supabase runs in the VISITOR'S browser here (sign-in, admin, My Orders),\n` +
+        `    so this breaks for real customers with no server-side error to notice.\n` +
+        `    Use the Cloudflare-proxied custom domain instead, e.g. https://db.crunchfitness.in`,
+    );
   }
 
   if (host && !/^https:/i.test(supabaseUrl) && !host.startsWith("localhost")) {
