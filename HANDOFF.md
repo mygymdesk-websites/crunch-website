@@ -1,3 +1,126 @@
+# Handoff
+
+> ## 🔴 Phase 2 is BLOCKED at the gate — see [§0](#0-phase-2-gate-report-080826) below.
+> Neither credential exists, the MyGymDesk API key has **never been generated**,
+> and three Track A dependencies the Phase 2 brief assumes are shipped are not
+> deployed. Nothing was built against guesses.
+
+---
+
+## 0. Phase 2 gate report (08/08/26)
+
+Ran the gate before touching any code. **Result: stop.** Evidence below — all of
+it read-only, from the MyGymDesk database and the deployed function list.
+
+### Blockers
+
+**B1 — No credentials at all.** There is no `.env.local` in the repo. Neither
+`MGD_API_KEY` nor any of the three Supabase variables is present, so the
+migrations cannot be applied and the API cannot be called.
+
+**B2 — The MyGymDesk API key has never been generated.** ⚠️ This is the one that
+needs action, not just a paste. `tenant_website_api_keys` has **zero rows** for
+the Crunch tenant (`af70dabd-bd5a-4734-aaeb-3548112ae1a9`). The Phase 0
+dependency "API key generated + toggle ON + allowed origins set + rate limit
+raised" has not been done. The owner must, in the MyGymDesk dashboard:
+
+1. **Settings → Growth & Apps → Integrations → Website Lead Capture** (Pro plan —
+   the tenant is on `pro`, so this screen is available).
+2. Copy the key **immediately** — it is shown once and stored only as a hash.
+3. **Toggle it ON.** New keys start inactive; every request 403s until it is on.
+4. Allowed Origins — full origins *with scheme*, comma-separated:
+   `https://crunchfitness.in, https://www.crunchfitness.in`
+5. Raise Rate Limit from 30/hr to **300/hr** (it is one shared budget across all
+   endpoints, not 30 each).
+
+**B3 — `website-products` is not deployed.** The Phase 2 brief specifies the shop
+grid and product detail read `GET /website-products` with `stockStatus`, `mrp`
+and `?in_stock_only`. That endpoint does not exist on the platform — Track A
+item **A1 has not shipped**. Deployed website-* functions are: `website-services`,
+`website-classes`, `website-session-price`, `website-booking-order`,
+`website-class-booking`, `website-service-booking`, `capture-website-lead`.
+Absent: `website-products`, `website-shop-order`, `website-membership-order`,
+`website-membership-purchase`.
+
+**B4 — `capture-website-lead` has no per-request `location_id`.** The brief
+specifies submitting "with the v1.4 `location_id` param (the user's selected
+location)". The deployed function (v111, updated 06/08/26) files every lead
+against the branch configured on the key:
+
+```ts
+location_id: keyRecord.location_id || null,
+```
+
+There is no request-body override. Track A item **A5 has not shipped**. Until it
+does, all website leads land on ONE branch regardless of what the visitor picked
+— they would have to be re-assigned by hand in the dashboard.
+
+**B5 — There is no API doc v1.4.** `docs/website-api-integration.md` in
+`mygymdesk-fresh` is still **v1.1 (2026-07-20)**. It contains no mention of
+`website-products`, `stockStatus`, or a v1.2/1.3/1.4 changelog. The response
+shapes the brief describes have no published contract to build against.
+
+### Client-config gaps (independent of the above)
+
+Even once B1–B5 clear, the tenant has almost nothing to display. Counts from the
+live MyGymDesk database:
+
+| Content | State | Effect on the site |
+|---|---|---|
+| `membership_plans` | 4 active, **0 published to self-serve** | `resource=plans` returns empty → Packages shows its empty state |
+| `class_types` | **0** | Classes catalog empty |
+| `class_sessions` | **0** | Weekly timetable empty at both branches |
+| `products` | **0** | Shop empty even after A1 ships |
+| `service_packages` | **0** | PT section hides (per brief, correctly) |
+
+The four plans that exist (Monthly ₹4,500 · Quarterly ₹10,000 · Half Yearly
+₹150,000 · Yearly ₹21,000) all have `is_published_self_serve = false`. Note
+**Half Yearly at ₹150,000** looks like a data-entry slip for ₹15,000 — worth
+checking before it is published. These prices also differ from the design's
+placeholder pricing (₹2,500 / ₹6,500 / ₹24,000), which is expected — live data
+wins — but the client should confirm the live figures are the ones to show.
+
+### Recovered and ready (no guessing needed once unblocked)
+
+| Thing | Value |
+|---|---|
+| Crunch tenant id | `af70dabd-bd5a-4734-aaeb-3548112ae1a9` (pro, active, approved) |
+| Vasant Kunj `mgd_location_id` | `c53f2dc1-8889-46d7-8589-2f4c40119840` |
+| Gurgaon `mgd_location_id` | `297b62e2-8fcf-4983-b9fd-12d358bc414d` |
+| Old Gurgaon tenant | `bfaa0774-…` — **suspended**, merge looks correct |
+
+MyGymDesk names the branches "Crunch Fitness — Vasant Kunj" (em dash); the
+website seed uses "Crunch Fitness, Vasant Kunj" (comma). No conflict — the join
+key is the UUID and the website name is display copy — but worth knowing they
+differ.
+
+### What was built while blocked
+
+Only the guardrail the brief asked for as permanent tooling, because it needs to
+exist *before* a URL is pasted, and it involves no guessing:
+
+- **`npm run check:env`** (`scripts/check-env.mjs`), wired into `npm run verify`.
+  Fails the build on a raw `*.supabase.co` URL, with `ALLOW_RAW_SUPABASE_URL=true`
+  as a local-dev-only escape hatch that is ignored for production builds. Also
+  fails on any server secret behind a `NEXT_PUBLIC_*` name, and on an
+  `mgd_live_…` or service-role value pasted into a public variable.
+  Verified across six cases: no-env, raw URL, raw URL + opt-out, raw URL +
+  production, proxied domain, and a leaked key.
+- `.env.example` documents the new vars, the key's once-only nature, and the
+  proxied-domain requirement.
+
+**Nothing else was touched.** `src/lib/content.ts` still returns fixtures, no
+migrations were applied, and no MGD wiring was written.
+
+### GO-LIVE BLOCKER
+
+If the Cloudflare proxy for the client's Supabase project is not ready and local
+dev proceeds on a raw `*.supabase.co` URL via `ALLOW_RAW_SUPABASE_URL=true`,
+**that must not reach production.** `check:env` enforces it on production builds,
+but the proxy still has to be set up before launch.
+
+---
+
 # Phase 1 — Foundations · Handoff
 
 **Repo:** `crunch-website` · **Branch:** `main` · **Date:** 08/08/2026
