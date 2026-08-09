@@ -10,10 +10,11 @@ import { ButtonLink } from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Field";
 import { CoverImage } from "@/components/ui/CoverImage";
 import { INDIAN_STATES } from "@/lib/fixtures/site-content";
-import { formatINR } from "@/lib/format";
+import { formatINR, isValidEmail, isValidIndianMobile } from "@/lib/format";
 import { formatAddress } from "@/lib/location-format";
 import type { MgdProduct } from "@/lib/mgd/types";
-import { GST_RATE, SHIPPING_FLAT_RATE, stockLabel } from "@/lib/shop";
+import { openRazorpayCheckout } from "@/lib/razorpay";
+import { stockLabel } from "@/lib/shop";
 
 type Fulfilment = "pickup" | "courier";
 
@@ -21,23 +22,57 @@ type Fulfilment = "pickup" | "courier";
  * Cart + checkout, as one screen (the design draws them that way: line items,
  * fulfilment choice and address on the left, a sticky summary on the right).
  *
- * PHASE 1: the pay button is disabled with honest "launching soon" copy.
- * Nothing here can take money, and pretending otherwise would be the worst
- * possible bug to ship. Phase 5 replaces the disabled button with the
- * MyGymDesk shop-order flow:
- *
+ * The flow:
  *   website-shop-order-create → Razorpay Checkout → website-shop-order
- *   → mirror into shop_orders → (courier) push to Shiprocket
+ *   → mirror into shop_orders → (courier) Shiprocket, from admin
  *
- * Every total below is a DISPLAY estimate. At Phase 5 the server re-resolves
- * price, stock and GST from MyGymDesk; a client-computed figure is never an
- * input to a payment.
+ * TOTALS. Product prices from the catalogue are ALL-IN — tax already handled —
+ * and the order endpoint charges exactly the sum of those lines. So this screen
+ * adds nothing on top: no client-computed GST, no shipping line. The number
+ * shown is the number charged, which is the only invariant worth protecting on
+ * a checkout. (Delivery is arranged after the order because the API has no
+ * concept of it; see the note by the fulfilment choice.)
+ *
+ * The displayed subtotal is still only a display: the server re-resolves every
+ * price, and a client figure is never an input to a payment.
  */
 export function CheckoutView({ products }: { products: MgdProduct[] }) {
   const { location } = useLocation();
-  const { lines, setQty, remove, hydrated } = useCart();
+  const { lines, setQty, remove, clear, hydrated } = useCart();
   const [fulfilment, setFulfilment] = useState<Fulfilment>("pickup");
   const fieldId = useId();
+
+  const [values, setValues] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    gstin: "",
+    line1: "",
+    line2: "",
+    city: "",
+    state: "",
+    pin: "",
+  });
+  const set = (key: keyof typeof values) => (value: string) =>
+    setValues((v) => ({ ...v, [key]: value }));
+
+  const [phase, setPhase] = useState<
+    "idle" | "working" | "gateway_offline" | "done"
+  >("idle");
+  const [error, setError] = useState<string | null>(null);
+  /** From 409 insufficient_stock — names the offending line and its ceiling. */
+  const [shortfall, setShortfall] = useState<{
+    productId: string;
+    available: number;
+  } | null>(null);
+  const [receipt, setReceipt] = useState<{
+    orderNumber: string;
+    invoiceNumber: string | null;
+    amountCharged: number;
+    oversold: boolean;
+    pickupLocationName: string | null;
+  } | null>(null);
+  const [testMode, setTestMode] = useState(false);
 
   // Live stock for the selected branch, supplied by the server. The cart holds
   // a snapshot (it renders on every page and cannot call MyGymDesk), so stock
@@ -48,6 +83,87 @@ export function CheckoutView({ products }: { products: MgdProduct[] }) {
     return (
       <div className="py-20 text-center text-[14px] text-muted">
         Loading your cart…
+      </div>
+    );
+  }
+
+  // These come BEFORE the empty-cart check on purpose: a successful order
+  // clears the cart, and showing "nothing to check out" to someone who just
+  // paid would be the worst possible ending.
+  if (phase === "done" && receipt) {
+    return (
+      <div className="mx-auto max-w-[560px] rounded-[16px] border border-line bg-surface p-8 text-center">
+        {testMode ? (
+          <div className="mb-4 inline-block rounded-pill border border-accent bg-accent-soft px-4 py-2 text-[11px] font-bold uppercase tracking-[.08em]">
+            Test mode — no real money moved
+          </div>
+        ) : null}
+        <div className="mb-2 font-display text-[26px] font-semibold uppercase">
+          Order placed
+        </div>
+        <p className="m-0 text-[14px] leading-[1.6] text-muted">
+          Order <b className="text-text">{receipt.orderNumber}</b> ·{" "}
+          {formatINR(receipt.amountCharged)} paid.
+          {receipt.invoiceNumber
+            ? ` GST invoice ${receipt.invoiceNumber} is on its way to your email.`
+            : " Your GST invoice is on its way to your email."}
+        </p>
+
+        {receipt.oversold ? (
+          <div className="mt-5 rounded-field border border-accent bg-accent-soft p-4 text-left text-[13px] leading-[1.65]">
+            <b>We&rsquo;ll confirm availability before dispatch.</b>
+            <br />
+            One of these went out of stock as you were paying. Your payment is
+            safe and the {receipt.pickupLocationName ?? location.short_name} team
+            will call you to sort it — nothing further is needed from you.
+          </div>
+        ) : null}
+
+        <p className="mt-5 text-[13px] leading-[1.6] text-muted">
+          {fulfilment === "pickup"
+            ? `Collect from ${receipt.pickupLocationName ?? location.short_name} — we'll message you when it's bagged and ready.`
+            : "We'll confirm the courier and tracking as soon as it's packed."}
+        </p>
+
+        <ButtonLink href="/account" className="mt-6" block>
+          View my orders
+        </ButtonLink>
+      </div>
+    );
+  }
+
+  if (phase === "gateway_offline") {
+    return (
+      <div className="mx-auto max-w-[560px] rounded-[16px] border border-line bg-surface p-8">
+        <div className="mb-2 font-display text-[24px] font-semibold uppercase">
+          Paying online is launching soon
+        </div>
+        <p className="m-0 text-[14px] leading-[1.6] text-muted">
+          We can&rsquo;t take card payments on the site just yet. Call{" "}
+          {location.short_name} and the desk will hold these at the counter —
+          UPI or card there, with the GST invoice the same minute.
+        </p>
+        <div className="mt-5 rounded-field border border-accent bg-accent-soft p-4">
+          <div className="text-[11px] font-bold uppercase tracking-[.08em] text-muted">
+            Call {location.short_name}
+          </div>
+          <a
+            href={`tel:${location.phone}`}
+            className="mt-1 block font-display text-[24px] font-semibold text-text"
+          >
+            {location.phone}
+          </a>
+        </div>
+        <p className="mt-4 text-[12px] leading-[1.6] text-muted">
+          Nothing has been charged and your cart is untouched.
+        </p>
+        <button
+          type="button"
+          onClick={() => setPhase("idle")}
+          className="mt-5 w-full cursor-pointer rounded-pill border border-line bg-transparent px-5 py-3 text-[12px] font-bold uppercase tracking-[.08em]"
+        >
+          Back to checkout
+        </button>
       </div>
     );
   }
@@ -75,10 +191,140 @@ export function CheckoutView({ products }: { products: MgdProduct[] }) {
     (sum, line) => sum + line.snapshot.price * line.qty,
     0,
   );
-  const shipping = isShip ? SHIPPING_FLAT_RATE : 0;
-  const taxable = subtotal + shipping;
-  const gst = Math.round(taxable * GST_RATE);
-  const total = taxable + gst;
+  // The charged total IS the line sum: catalogue prices are all-in, and the
+  // order endpoint computes from those same figures. Adding a GST line or a
+  // shipping fee here would print a number the gateway never asks for.
+  const total = subtotal;
+
+  async function pay() {
+    setError(null);
+    setShortfall(null);
+
+    if (values.name.trim().length < 2) return setError("Enter your full name.");
+    if (!isValidIndianMobile(values.phone))
+      return setError("Enter a valid 10-digit mobile number.");
+    if (!isValidEmail(values.email))
+      return setError("Enter a valid email address.");
+    if (isShip && (!values.line1.trim() || !values.city.trim() || !values.pin.trim()))
+      return setError("Enter your delivery address, city and PIN code.");
+
+    setPhase("working");
+
+    const items = lines.map((line) => ({
+      productId: line.productId,
+      quantity: line.qty,
+      name: line.snapshot.name,
+      unitPrice: line.snapshot.price,
+      brand: line.snapshot.brand ?? null,
+      imageUrl: line.snapshot.imageUrl ?? null,
+    }));
+
+    try {
+      const res = await fetch("/api/shop/order-create", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          items: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+          name: values.name,
+          phone: values.phone,
+          email: values.email,
+          locationSlug: location.slug,
+        }),
+      });
+      const order = await res.json();
+
+      if (!res.ok || !order.ok) {
+        if (
+          order?.error === "gateway_not_configured" ||
+          order?.error === "gateway_reconnect_required" ||
+          order?.error === "plan_upgrade_required"
+        ) {
+          setPhase("gateway_offline");
+          return;
+        }
+        // Stock moved under us. Name the line and its ceiling so the customer
+        // can fix the one that is short instead of guessing.
+        if (order?.error === "insufficient_stock" && order?.productId) {
+          setShortfall({
+            productId: order.productId,
+            available: Number(order.available ?? 0),
+          });
+        }
+        setError(order?.message ?? "We couldn't start the payment.");
+        setPhase("idle");
+        return;
+      }
+
+      setTestMode(Boolean(order.testMode));
+
+      const capture = await openRazorpayCheckout({
+        keyId: order.keyId,
+        orderId: order.razorpayOrderId,
+        amount: order.amountInPaise, // paise — NOT order.amount, which is rupees
+        currency: order.currency,
+        name: location.name,
+        description: `Shop order ${order.orderNumber}`,
+        customer: { name: values.name, phone: values.phone, email: values.email },
+      });
+
+      const confirm = () =>
+        fetch("/api/shop/confirm", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            orderId: order.orderId,
+            payment: {
+              orderId: capture.razorpay_order_id,
+              captureId: capture.razorpay_payment_id,
+              signature: capture.razorpay_signature,
+            },
+            fulfilment,
+            locationSlug: location.slug,
+            name: values.name,
+            phone: values.phone,
+            email: values.email,
+            gstin: values.gstin || undefined,
+            address: isShip
+              ? {
+                  line1: values.line1,
+                  line2: values.line2,
+                  city: values.city,
+                  state: values.state,
+                  postalCode: values.pin,
+                }
+              : undefined,
+            items,
+          }),
+        });
+
+      // Idempotent upstream, so a transport drop after capture is recoverable
+      // by simply asking again rather than stranding a paid order.
+      let confirmRes: Response;
+      try {
+        confirmRes = await confirm();
+      } catch {
+        confirmRes = await confirm();
+      }
+      const result = await confirmRes.json();
+
+      if (!confirmRes.ok || !result.ok) {
+        setError(
+          result?.message ??
+            "Your payment went through but we couldn't confirm the order. " +
+              "Please call the gym — do not pay again.",
+        );
+        setPhase("idle");
+        return;
+      }
+
+      setReceipt(result);
+      clear();
+      setPhase("done");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The payment did not complete.");
+      setPhase("idle");
+    }
+  }
 
   return (
     <div className="grid grid-cols-1 items-start gap-[26px] min-[1220px]:grid-cols-[1fr_350px]">
@@ -143,10 +389,34 @@ export function CheckoutView({ products }: { products: MgdProduct[] }) {
                   </span>
                 </span>
 
-                <QtyStepper
-                  qty={line.qty}
-                  onChange={(next) => setQty(line.productId, next)}
-                />
+                <span className="grid gap-1.5">
+                  <QtyStepper
+                    qty={line.qty}
+                    onChange={(next) => setQty(line.productId, next)}
+                  />
+                  {/* The gym ran short between adding and paying. Correcting it
+                      in place beats a generic error that makes the customer
+                      guess which of six lines is the problem. */}
+                  {shortfall?.productId === line.productId ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (shortfall.available > 0) {
+                          setQty(line.productId, shortfall.available);
+                        } else {
+                          remove(line.productId);
+                        }
+                        setShortfall(null);
+                        setError(null);
+                      }}
+                      className="cursor-pointer rounded-field border border-accent bg-accent-soft px-2 py-1 text-[10px] font-bold uppercase tracking-[.06em]"
+                    >
+                      {shortfall.available > 0
+                        ? `Only ${shortfall.available} left — set to ${shortfall.available}`
+                        : "Sold out — remove"}
+                    </button>
+                  ) : null}
+                </span>
 
                 <span className="min-w-[88px] shrink-0 text-right">
                   <span className="block text-[16px] font-bold">
@@ -186,8 +456,11 @@ export function CheckoutView({ products }: { products: MgdProduct[] }) {
               selected={isShip}
               onSelect={() => setFulfilment("courier")}
               title="Ship to me"
-              price={formatINR(SHIPPING_FLAT_RATE)}
-              detail="Shiprocket, 3–5 working days anywhere in India."
+              price="Quoted after"
+              // The API charges product lines only — it has no delivery
+              // concept — so a courier fee cannot be collected on this rail.
+              // Saying so beats printing a number nobody will be charged.
+              detail="We'll confirm the courier and any charge before dispatch."
             />
           </div>
         </div>
@@ -203,6 +476,8 @@ export function CheckoutView({ products }: { products: MgdProduct[] }) {
                 label="Full name"
                 placeholder="Full name"
                 autoComplete="name"
+                value={values.name}
+                onChange={(e) => set("name")(e.target.value)}
               />
               <Input
                 id={`${fieldId}-phone`}
@@ -211,6 +486,8 @@ export function CheckoutView({ products }: { products: MgdProduct[] }) {
                 type="tel"
                 inputMode="tel"
                 autoComplete="tel"
+                value={values.phone}
+                onChange={(e) => set("phone")(e.target.value)}
               />
             </div>
             <Input
@@ -219,6 +496,8 @@ export function CheckoutView({ products }: { products: MgdProduct[] }) {
               placeholder="Email address (for the GST invoice)"
               type="email"
               autoComplete="email"
+              value={values.email}
+              onChange={(e) => set("email")(e.target.value)}
             />
 
             {isShip ? (
@@ -228,12 +507,16 @@ export function CheckoutView({ products }: { products: MgdProduct[] }) {
                   label="Flat / house number, building"
                   placeholder="Flat / house no., building"
                   autoComplete="address-line1"
+                  value={values.line1}
+                  onChange={(e) => set("line1")(e.target.value)}
                 />
                 <Input
                   id={`${fieldId}-line2`}
                   label="Street, area, landmark"
                   placeholder="Street, area, landmark"
                   autoComplete="address-line2"
+                  value={values.line2}
+                  onChange={(e) => set("line2")(e.target.value)}
                 />
                 <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
                   <Input
@@ -241,12 +524,15 @@ export function CheckoutView({ products }: { products: MgdProduct[] }) {
                     label="City"
                     placeholder="City"
                     autoComplete="address-level2"
+                    value={values.city}
+                    onChange={(e) => set("city")(e.target.value)}
                   />
                   <Select
                     id={`${fieldId}-state`}
                     label="State"
-                    defaultValue=""
                     autoComplete="address-level1"
+                    value={values.state}
+                    onChange={(e) => set("state")(e.target.value)}
                   >
                     <option value="">State</option>
                     {INDIAN_STATES.map((state) => (
@@ -259,6 +545,8 @@ export function CheckoutView({ products }: { products: MgdProduct[] }) {
                     placeholder="PIN code"
                     inputMode="numeric"
                     autoComplete="postal-code"
+                    value={values.pin}
+                    onChange={(e) => set("pin")(e.target.value)}
                   />
                 </div>
               </div>
@@ -277,6 +565,8 @@ export function CheckoutView({ products }: { products: MgdProduct[] }) {
               id={`${fieldId}-gstin`}
               label="GSTIN for company invoices"
               placeholder="GSTIN (optional, for company invoices)"
+              value={values.gstin}
+              onChange={(e) => set("gstin")(e.target.value)}
             />
           </div>
         </div>
@@ -293,11 +583,11 @@ export function CheckoutView({ products }: { products: MgdProduct[] }) {
             value={formatINR(subtotal)}
           />
           <SummaryRow
-            label={isShip ? "Shipping (Shiprocket)" : "Pickup at gym"}
-            value={isShip ? formatINR(SHIPPING_FLAT_RATE) : "Free"}
+            label={isShip ? "Delivery" : "Pickup at gym"}
+            value={isShip ? "Arranged after checkout" : "Free"}
             accent={!isShip}
           />
-          <SummaryRow label="GST (18%)" value={formatINR(gst)} />
+          <SummaryRow label="GST" value="Included" />
         </div>
 
         <div className="flex justify-between gap-3 py-4 text-[20px] font-bold">
@@ -305,32 +595,36 @@ export function CheckoutView({ products }: { products: MgdProduct[] }) {
           <span>{formatINR(total)}</span>
         </div>
 
+        {testMode ? (
+          <div className="mb-3 rounded-pill border border-accent bg-accent-soft px-4 py-2 text-center text-[11px] font-bold uppercase tracking-[.08em]">
+            Test mode — no real money moved
+          </div>
+        ) : null}
+
         <button
           type="button"
-          disabled
-          title="Online payment launches in Phase 5"
-          className="w-full cursor-not-allowed rounded-pill border-0 bg-accent px-5 py-4 text-[13px] font-bold uppercase tracking-[.08em] text-accent-ink opacity-55"
+          onClick={pay}
+          disabled={phase === "working"}
+          className="w-full cursor-pointer rounded-pill border-0 bg-accent px-5 py-4 text-[13px] font-bold uppercase tracking-[.08em] text-accent-ink transition-[filter] hover:brightness-[1.08] disabled:cursor-wait disabled:opacity-60"
         >
-          Pay {formatINR(total)} — launching soon
+          {phase === "working" ? "Working…" : `Pay ${formatINR(total)}`}
         </button>
 
-        <p className="m-0 mt-3.5 text-center text-[12px] leading-[1.6] text-muted">
-          Online shop payment isn&rsquo;t live yet. Call the{" "}
-          {location.short_name} desk on{" "}
-          <a href={`tel:${location.phone}`} className="border-b border-line">
-            {location.phone}
-          </a>{" "}
-          and we&rsquo;ll hold these for you at the counter.
-        </p>
+        {error ? (
+          <p className="m-0 mt-3.5 text-[13px] leading-[1.6] text-accent" role="alert">
+            {error}
+          </p>
+        ) : null}
 
-        <p className="m-0 mt-3 text-center text-[11px] leading-[1.6] text-muted">
-          When it launches: UPI, cards and netbanking via Razorpay, GST invoice
-          emailed after payment. See our{" "}
+        <p className="m-0 mt-3.5 text-center text-[12px] leading-[1.6] text-muted">
+          UPI, cards and netbanking via Razorpay. Your GST invoice is emailed
+          after payment. See our{" "}
           <Link href="/policies/refund" className="border-b border-line">
             Refund Policy
           </Link>
           .
         </p>
+
       </aside>
     </div>
   );
