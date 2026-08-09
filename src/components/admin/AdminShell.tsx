@@ -18,15 +18,15 @@ import type { AdminUser } from "@/lib/supabase/types";
  * muted states need no icon-specific styling.
  */
 
-/** Nav items. Phase-5 sections are present but visibly parked. */
+/** Nav items. `ready: false` parks a section with a chip; nothing is parked now. */
 const NAV = [
   { href: "/admin", label: "Site settings", ready: true, icon: SlidersIcon },
   { href: "/admin/enquiries", label: "Enquiries", ready: true, icon: InboxIcon },
-  { href: "/admin/orders", label: "Orders", ready: false, icon: BagIcon },
+  { href: "/admin/orders", label: "Orders", ready: true, icon: BagIcon },
   {
     href: "/admin/shipments",
     label: "Shipments",
-    ready: false,
+    ready: true,
     icon: TruckIcon,
   },
 ] as const;
