@@ -371,6 +371,50 @@ and deleted; its password was set in the browser and never recorded.
 
 ---
 
+## 0.0.4 Phases 4–5 — verification log
+
+### Phase 4 (membership) — LIVE-VERIFIED to the pay step
+
+| check | result |
+|---|---|
+| order, real plan | **503 `gateway_not_configured`** → designed state |
+| unknown plan id | **404 `plan_not_found`** → its own state |
+| bad phone / email | refused before a payment sheet could open |
+| confirm, forged capture | 404, nothing created |
+| Razorpay SDK on the 503 path | never loaded |
+
+### Phase 5 (shop) — LIVE-VERIFIED to the pay step
+
+Catalogue, per branch, against the seeded fixtures:
+
+| | Vasant Kunj | Gurgaon |
+|---|---|---|
+| Whey (brand + MRP) | `in_stock` · addable | `low_stock` · addable |
+| Towel (no brand/MRP) | `low_stock` · addable | `out_of_stock` · **button disabled** |
+
+MRP renders only where set; brand absent on the towel, as returned.
+
+Order-create, real product ids:
+
+| case | result |
+|---|---|
+| whey ×2 @ VK (stock fine) | **503 gateway** — the clean terminal |
+| towel ×99 @ VK | **409 `insufficient_stock`**, `available: 5` |
+| towel ×1 @ Gurgaon | **409**, `available: 0` |
+| mixed cart, one line short | 409 naming **only** the short line |
+| empty cart · qty 0 · qty 100 | 422 `cart_empty` · 400 `invalid_quantity` ×2 |
+| courier with no address | 400, refused before any upstream call |
+
+**The stock check runs before the gateway check** — 409 beats 503 — so a short
+cart is corrected before anyone reaches a payment sheet.
+
+Inline correction, in the browser: over-ordering the towel renders
+**"Only 5 left — set to 5"** on that line; clicking it sets the quantity to 5
+and clears the warning. `available: 0` renders "Sold out — remove" instead.
+The 5 matches the inclusive `low_stock_threshold`.
+
+---
+
 ## 0.0.1 CLIENT-CONTENT-REQUIRED
 
 Everything below was placeholder copy from the design mock that read as a
