@@ -448,6 +448,40 @@ The 5 matches the inclusive `low_stock_threshold`.
 
 ---
 
+## 0.0.5 Courier webhook path — vendor-neutral
+
+**The webhook is `/api/shipping/webhook`, not `/api/shiprocket/webhook`.**
+
+The courier's own panel refuses a webhook URL containing their name, and also
+rejects the substrings `sr` and `kr` anywhere in the path. So the endpoint
+cannot be called what it obviously is.
+
+This is an external constraint with no trace in the code — nothing about the
+path explains itself, and renaming it back is the obvious tidy-up. It is
+pinned by `src/lib/__tests__/webhook-path.test.ts`, which fails the moment
+someone reintroduces a rejected substring.
+
+The old path still exists and answers **410 Gone**, not a redirect. It was
+never registered anywhere (the integration's credentials had not arrived), so
+there is no sender to keep working; a 410 tells a sender to stop, while a
+redirect would be a coin flip — many webhook senders do not follow one on POST,
+and the ones that do would hide the misconfiguration rather than surface it.
+
+**The token check is unchanged.** Verified after the move:
+
+| request | result |
+|---|---|
+| token unset in env | 503 `not_configured` — refuses everything |
+| no `x-api-key` header | **401** |
+| wrong `x-api-key` | **401** |
+| correct `x-api-key` | 200 `{matched:false}` on an unknown AWB |
+| correct token, no AWB | 200 `{matched:false}` — acknowledged, not retried |
+| old path, POST and GET | **410 `endpoint_moved`** |
+
+Register `https://<domain>/api/shipping/webhook` in the courier panel.
+
+---
+
 ## 0.0.1 CLIENT-CONTENT-REQUIRED
 
 Everything below was placeholder copy from the design mock that read as a
