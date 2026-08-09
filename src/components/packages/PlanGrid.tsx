@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 
 import { useLocation } from "@/components/providers/LocationProvider";
+import { MembershipPurchaseModal } from "@/components/packages/MembershipPurchaseModal";
 import { Button } from "@/components/ui/Button";
 import { Honeypot, Input, Textarea } from "@/components/ui/Field";
 import { Modal, SuccessMark } from "@/components/ui/Modal";
@@ -113,7 +114,10 @@ export function PlanGrid({
         plan={enquiryPlan}
         onClose={() => setEnquiryPlan(null)}
       />
-      <PlanCheckoutPendingModal
+
+      {/* Priced plans go to the real purchase flow; unpriced ones still route
+          to the enquiry form, because there is nothing to charge. */}
+      <MembershipPurchaseModal
         plan={infoPlan}
         onClose={() => setInfoPlan(null)}
       />
@@ -265,72 +269,6 @@ function PlanEnquiryModal({
     </Modal>
   );
 }
-
-/**
- * Priced plans, before Phase 4.
- *
- * Rather than mock a Razorpay flow that cannot charge anything, this says
- * plainly where to pay today. The plan summary is the same one the real
- * checkout will open with.
- */
-function PlanCheckoutPendingModal({
-  plan,
-  onClose,
-}: {
-  plan: MgdPlan | null;
-  onClose: () => void;
-}) {
-  const { location } = useLocation();
-  const headingId = useId();
-
-  return (
-    <Modal open={plan !== null} onClose={onClose} labelledBy={headingId}>
-      <div className="mb-2 text-[11px] font-bold uppercase tracking-[.16em] text-accent">
-        Membership
-      </div>
-      <h2
-        id={headingId}
-        className="m-0 mb-[18px] font-display text-[26px] font-semibold uppercase"
-      >
-        {plan?.name}
-      </h2>
-
-      <div className="mb-5 grid gap-3 rounded-[12px] border border-line bg-bg p-[18px]">
-        <Row label="Plan" value={plan?.name ?? ""} />
-        <Row label="Billing" value={plan?.intervalLabel ?? ""} />
-        <Row label="Location" value={location.short_name} />
-        <Row label="Starts" value="On your first check-in" />
-        <div className="flex justify-between gap-3 border-t border-line pt-3 text-[17px] font-bold">
-          <span>Total</span>
-          <span>{plan ? formatINR(plan.price) : "—"}</span>
-        </div>
-      </div>
-
-      <p className="m-0 mb-5 text-[13px] leading-[1.65] text-muted">
-        Paying for a membership online launches shortly. Until then, call{" "}
-        <a href={`tel:${location.phone}`} className="border-b border-line">
-          the {location.short_name} desk
-        </a>{" "}
-        or drop in — we&rsquo;ll take payment by UPI or card and email the GST
-        invoice the same minute.
-      </p>
-
-      <Button block onClick={onClose}>
-        Got it
-      </Button>
-    </Modal>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-3 text-[14px]">
-      <span className="text-muted">{label}</span>
-      <b className="text-right">{value}</b>
-    </div>
-  );
-}
-
 /** Loading state for a plan grid. */
 export function PlanGridSkeleton({ count = 4 }: { count?: number }) {
   return (
