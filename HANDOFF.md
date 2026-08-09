@@ -383,6 +383,39 @@ and deleted; its password was set in the browser and never recorded.
 | confirm, forged capture | 404, nothing created |
 | Razorpay SDK on the 503 path | never loaded |
 
+### Fulfilment, admin and RLS — verified against seeded mirror orders
+
+Four ZZ-prefixed orders (mixed pickup/courier/oversold, one owned by a
+different customer as the control), since deleted.
+
+**RLS, proved at the database with real JWT claims:**
+
+| role | sees |
+|---|---|
+| anon | **nothing** — `42501`, no base-table privilege at all |
+| customer `zz-authprobe@` | their **3** orders, 3 items, **0** shipments (the only shipment is someone else's) |
+| a different signed-in customer | **0** |
+| admin | all **4** orders, 1 shipment |
+
+**Every status transition, driven through the admin UI:**
+
+| order | move | result |
+|---|---|---|
+| pickup | placed → ready_for_pickup → collected | both applied, `packed_at` + `completed_at` stamped |
+| courier | packed → **shipped, no shipment** | **refused**: "Create the shipment first — shipped needs an AWB to track." Row stayed `packed`. |
+| pickup (oversold) | ready_for_pickup → collected | applied |
+| courier (with shipment) | shipped → delivered | applied |
+
+Admin filters (status, fulfilment, branch, oversold) each returned exactly the
+expected subset. The oversold order carries a "Stock check" badge on the board
+and a customer-facing "we'll confirm availability" note in My Orders.
+
+**Regression:** 0 horizontal overflow at 360 and 1440 on `/checkout`, `/cart`,
+`/account`, `/admin/orders`, `/admin/shipments`, `/packages`, `/shop`.
+`/checkout` is `noindex, follow`; `/account` is `noindex, nofollow`; the sitemap
+carries `/shop` and `/packages` and excludes `/checkout`, `/account` and
+`/admin`. 43 unit tests, all three guard scripts green.
+
 ### Phase 5 (shop) — LIVE-VERIFIED to the pay step
 
 Catalogue, per branch, against the seeded fixtures:

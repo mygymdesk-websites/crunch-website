@@ -41,40 +41,61 @@ export function MyOrders({ locationName }: { locationName: string }) {
     let cancelled = false;
 
     (async () => {
-      const { data: orders, error } = await supabase
-        .from("shop_orders")
-        .select("*")
-        .order("placed_at", { ascending: false })
-        .limit(50);
+      try {
+        const { data: orders, error } = await supabase
+          .from("shop_orders")
+          .select("*")
+          .order("placed_at", { ascending: false })
+          .limit(50);
 
-      if (cancelled) return;
-      if (error) {
-        setState({
-          loading: false,
-          orders: [],
-          items: [],
-          shipments: [],
-          error: "We couldn't load your orders just now.",
-        });
-        return;
-      }
+        if (cancelled) return;
+        if (error) {
+          setState({
+            loading: false,
+            orders: [],
+            items: [],
+            shipments: [],
+            error: "We couldn't load your orders just now.",
+          });
+          return;
+        }
 
-      const rows = (orders ?? []) as ShopOrder[];
-      let items: ShopOrderItem[] = [];
-      let shipments: Shipment[] = [];
+        const rows = (orders ?? []) as ShopOrder[];
+        let items: ShopOrderItem[] = [];
+        let shipments: Shipment[] = [];
 
-      if (rows.length) {
-        const ids = rows.map((o) => o.id);
-        const [{ data: itemRows }, { data: shipRows }] = await Promise.all([
-          supabase.from("shop_order_items").select("*").in("order_id", ids),
-          supabase.from("shipments").select("*").in("order_id", ids),
-        ]);
-        items = (itemRows ?? []) as ShopOrderItem[];
-        shipments = (shipRows ?? []) as Shipment[];
-      }
+        if (rows.length) {
+          const ids = rows.map((o) => o.id);
+          const [{ data: itemRows }, { data: shipRows }] = await Promise.all([
+            supabase.from("shop_order_items").select("*").in("order_id", ids),
+            supabase.from("shipments").select("*").in("order_id", ids),
+          ]);
+          items = (itemRows ?? []) as ShopOrderItem[];
+          shipments = (shipRows ?? []) as Shipment[];
+        }
 
-      if (!cancelled) {
-        setState({ loading: false, orders: rows, items, shipments, error: null });
+        if (!cancelled) {
+          setState({
+            loading: false,
+            orders: rows,
+            items,
+            shipments,
+            error: null,
+          });
+        }
+      } catch {
+        // A transport failure (offline, blocked origin) rejects rather than
+        // returning an error object. Without this the view would sit on
+        // "Loading your orders…" forever, which reads as a hang, not a problem.
+        if (!cancelled) {
+          setState({
+            loading: false,
+            orders: [],
+            items: [],
+            shipments: [],
+            error: "We couldn't load your orders just now.",
+          });
+        }
       }
     })();
 
@@ -141,7 +162,9 @@ export function MyOrders({ locationName }: { locationName: string }) {
                 </span>
                 <span className="mt-0.5 block text-[12px] text-muted">
                   {formatDate(order.placed_at)} ·{" "}
-                  {order.fulfilment === "pickup" ? "Collect at gym" : "Delivery"}
+                  {order.fulfilment === "pickup"
+                    ? "Collect at gym"
+                    : "Delivery"}
                 </span>
               </span>
 
@@ -166,7 +189,10 @@ export function MyOrders({ locationName }: { locationName: string }) {
               <div className="border-t border-line bg-bg px-5 py-4">
                 <ul className="m-0 grid list-none gap-2 p-0">
                   {lines.map((line) => (
-                    <li key={line.id} className="flex justify-between gap-3 text-[13px]">
+                    <li
+                      key={line.id}
+                      className="flex justify-between gap-3 text-[13px]"
+                    >
                       <span>
                         {line.quantity} × {line.name}
                       </span>

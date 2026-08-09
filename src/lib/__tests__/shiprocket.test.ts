@@ -82,9 +82,9 @@ describe("createOrder", () => {
         phone: "9876543210",
         email: "asha@example.com",
         line1: "12 MG Road",
-        city: "New Delhi",
-        state: "Delhi",
-        postalCode: "110070",
+        city: "ZZ Test City",
+        state: "ZZ Test State",
+        postalCode: "999999",
       },
       lines: [{ name: "Whey", sku: "WHEY-1", quantity: 2, unitPrice: 2499 }],
       subTotal: 4998,
@@ -95,7 +95,7 @@ describe("createOrder", () => {
 
     const body = JSON.parse(calls[1].init.body as string);
     expect(body.order_id).toBe("CF-S-1");
-    expect(body.billing_pincode).toBe("110070");
+    expect(body.billing_pincode).toBe("999999");
     expect(body.shipping_is_billing).toBe(true);
     expect(body.order_items[0]).toMatchObject({
       sku: "WHEY-1",
@@ -124,7 +124,7 @@ describe("createOrder", () => {
         line1: "L1",
         city: "C",
         state: "S",
-        postalCode: "110070",
+        postalCode: "999999",
       },
       lines: [],
       subTotal: 0,
@@ -151,7 +151,7 @@ describe("createOrder", () => {
           line1: "L1",
           city: "C",
           state: "S",
-          postalCode: "110070",
+          postalCode: "999999",
         },
         lines: [],
         subTotal: 0,
