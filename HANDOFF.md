@@ -2,29 +2,68 @@
 
 ## 0.0 Phase 3 report (08/08/26) — gate FAILED, Part 3 delivered
 
-### 🔴 Part 1 (booking) — both gate conditions fail
+### ✅ Part 1 (booking) — built, minus the payment leg
 
-**(a) No bookable inventory.** The sessions endpoint returns `{"sessions":[]}`
-at both branches. At the database: **0 class types, 0 class sessions, 0
-services.** There is nothing to book.
+Gate re-checked with the fixtures live: **6 sessions across both branches**
+(Vasant Kunj Mon/Wed/Fri 07:00, Gurgaon Tue/Thu/Sat 18:00), ₹500, capacity 10.
+The gateway is still deliberately absent, so `website-booking-order` answers
+`503 gateway_not_configured` — handled as a designed state, not an error.
 
-**(b) No payment gateway.** `tenant_payment_settings` has **zero rows** for the
-tenant, so `website-booking-order` would return `503 gateway_not_configured`.
-I could not call it to confirm — that needs a `session_id`, which (a) means
-does not exist — but the absence of any gateway row is conclusive.
+**Flow:** timetable slot → details → authoritative price confirmation → pay.
 
-To resume Part 1 I need both:
+**The session id is never booked as handed.** `website-classes` returns a weekly
+TEMPLATE whose `id` is the next real occurrence and rolls forward, and the
+timetable is cached 15 minutes. So the modal posts the stable `templateKey` and
+`/api/booking/quote` re-resolves the current id from a `fresh` read, then quotes
+from `website-session-price`.
 
-1. **At least one scheduled future class session** — a class type, then a
-   session on the timetable at a branch, priced (a ₹0 session is refused with
-   `422 session_not_priced` and can never be booked online).
-2. **MGD test-mode Razorpay credentials attached to the tenant**, per the
-   Track A pattern. `test_mode: true` in the order response is expected and
-   already flows to the planned TEST MODE ribbon.
+`templateKey` is `dayOfWeek-startTime-classTypeId`, which is **not unique on its
+own** — the same class at the same hour on the same weekday at two branches
+produces the same key. The match is on templateKey **and** branch. Verified: the
+Vasant Kunj key with the Gurgaon branch is refused, not silently cross-booked.
 
-Nothing of Part 1 was built — no booking modal, no Checkout mount, no error
-states. Building it blind against an unverifiable contract is exactly what the
-gate exists to prevent.
+**Endpoints** (all server-side; the key never reaches the browser):
+
+| route | does |
+|---|---|
+| `POST /api/booking/quote` | fresh re-resolve + authoritative price |
+| `POST /api/booking/order` | mints the Razorpay order (503 today) |
+| `POST /api/booking/confirm` | records the booking after capture |
+
+**Slot states:** bookable, ≤3 left (accent "n spots left"), full (disabled,
+"Full" — computed as at-or-over capacity because `spotsBooked` under-reports),
+and unpriced → "Enquire", which routes to the enquiry form rather than a booking
+form that would dead-end at `session_not_priced`.
+
+**Verified live** against the fixtures:
+
+| check | result |
+|---|---|
+| quote, valid slot | 200, real session id, ₹500, 10 spots |
+| quote, unknown templateKey | 409 `session_not_found` |
+| quote, right key + wrong branch | 409 `session_not_found` |
+| order | **503 `gateway_not_configured`** → designed state |
+| order, bad phone / email | 400 `invalid_phone` / `invalid_email` |
+| confirm, no capture | 400 `invalid_capture_id` |
+| confirm, forged capture | 503 — refused before verification, nothing written |
+| Gurgaon branch | Tue/Thu/Sat only; quote returns "Crunch Fitness — Gurgaon" |
+| 360px | 0 overflow, modal 320px |
+| Razorpay SDK on the 503 path | **never downloaded** |
+
+The gateway-offline state names the branch, shows its real phone as a `tel:`
+link, and says plainly that nothing was charged and no place is held.
+
+**What resumes when the client's test keys land.** Nothing here changes shape.
+`/api/booking/order` starts returning an order instead of a 503; the modal
+already continues into `openRazorpayCheckout` (`src/lib/razorpay.ts`, loaded on
+demand so no visitor downloads a payment SDK to read a timetable) and then
+`/api/booking/confirm`. The **TEST MODE ribbon** is written and keyed off the
+API's own `test_mode` flag on the order response — never inferred from the shape
+of a key, so it cannot lie in either direction. It is currently unreachable
+because no order can be minted.
+
+**Budget note:** one booking attempt costs 3 requests against the shared 300/hr
+key — fresh sessions + price on quote, order on pay. Display reads stay cached.
 
 ### 🔴 Part 2 (navigation performance) — superseded, see §0.0.2
 

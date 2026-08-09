@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { BookingModal } from "@/components/classes/BookingModal";
 import { useTrialModal } from "@/components/providers/TrialModalProvider";
 import { Button } from "@/components/ui/Button";
 import { CoverImage } from "@/components/ui/CoverImage";
@@ -25,9 +26,10 @@ import type { DayOfWeek, MgdClassSession } from "@/lib/mgd/types";
  * component projects that template onto the current Mon–Sun week so a visitor
  * sees real dates, which is what the design draws.
  *
- * Booking is Phase 3. It deliberately does not fake a booking flow here,
- * because a real one has to re-fetch the session id immediately beforehand —
- * the id in a cached timetable rolls forward as occurrences pass.
+ * Booking rows hand the whole session to `BookingModal`, which re-resolves the
+ * bookable id server-side before quoting. Nothing here books the id it is
+ * holding: this list is cached for 15 minutes and each `id` is the next real
+ * occurrence, which rolls forward as occurrences pass.
  */
 
 interface DayColumn {
@@ -51,6 +53,7 @@ export function Timetable({
   const { openTrial } = useTrialModal();
   const [activeIndex, setActiveIndex] = useState(0);
   const [typeFilter, setTypeFilter] = useState("All");
+  const [booking, setBooking] = useState<MgdClassSession | null>(null);
 
   // Monday-first week starting from this Monday, in IST.
   const week = useMemo<DayColumn[]>(() => {
@@ -178,21 +181,41 @@ export function Timetable({
       ) : (
         <div className="overflow-hidden rounded-b-[12px] border border-t-0 border-line">
           {visible.map((session) => (
-            <TimetableRow key={session.id} session={session} />
+            <TimetableRow
+              key={session.id}
+              session={session}
+              onBook={() => setBooking(session)}
+            />
           ))}
         </div>
       )}
+
+      <BookingModal
+        session={booking}
+        open={booking !== null}
+        onClose={() => setBooking(null)}
+      />
     </div>
   );
 }
 
-function TimetableRow({ session }: { session: MgdClassSession }) {
+function TimetableRow({
+  session,
+  onBook,
+}: {
+  session: MgdClassSession;
+  onBook: () => void;
+}) {
   const { openTrial } = useTrialModal();
-
   // `spotsBooked` can under-report on very busy gyms, so treat "at or over
   // capacity" as full rather than testing for exact equality.
   const full = session.spotsBooked >= session.spotsTotal;
   const left = Math.max(0, session.spotsTotal - session.spotsBooked);
+
+  // A zero-priced session cannot be booked online: the API refuses it with
+  // `session_not_priced`. Say so on the row rather than letting someone fill in
+  // a form that is guaranteed to dead-end.
+  const unpriced = session.priceNonMember <= 0;
   const pct = Math.min(
     100,
     Math.round((session.spotsBooked / Math.max(1, session.spotsTotal)) * 100),
@@ -263,14 +286,25 @@ function TimetableRow({ session }: { session: MgdClassSession }) {
       <button
         type="button"
         disabled={full}
-        onClick={() => openTrial(session.name)}
+        // An unpriced class cannot take money, so it routes to the enquiry
+        // form rather than a booking form that would dead-end at the quote.
+        onClick={unpriced ? () => openTrial(session.name) : onBook}
+        aria-label={
+          full
+            ? `${session.name} at ${formatTime(session.startTime)} is full`
+            : unpriced
+              ? `Enquire about ${session.name} at ${formatTime(session.startTime)}`
+              : `Book ${session.name} at ${formatTime(session.startTime)}`
+        }
         className={`shrink-0 rounded-pill border px-5 py-2.5 text-[11px] font-bold uppercase tracking-[.08em] transition-[filter] ${
           full
             ? "cursor-default border-line bg-transparent text-muted"
-            : "cursor-pointer border-accent bg-accent text-accent-ink hover:brightness-[1.08]"
+            : unpriced
+              ? "cursor-pointer border-line bg-transparent text-text hover:brightness-[1.08]"
+              : "cursor-pointer border-accent bg-accent text-accent-ink hover:brightness-[1.08]"
         }`}
       >
-        {full ? "Full" : "Book"}
+        {full ? "Full" : unpriced ? "Enquire" : "Book"}
       </button>
     </div>
   );
