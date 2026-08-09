@@ -15,6 +15,8 @@ export type MgdErrorCode =
   | "unauthorized"
   | "key_inactive"
   | "origin_not_allowed"
+  // 1.6 — the gym's plan does not cover this endpoint. Never consumes budget.
+  | "plan_upgrade_required"
   | "rate_limit_exceeded"
   | "method_not_allowed"
   | "internal_error"
@@ -56,6 +58,19 @@ export type MgdErrorCode =
   | "session_not_bookable"
   | "identity_required"
   | "session_not_priced"
+  // shop / membership (1.5)
+  | "insufficient_stock"
+  | "product_unavailable"
+  | "cart_empty"
+  | "order_not_priced"
+  | "order_not_payable"
+  | "order_not_found"
+  | "plan_not_found"
+  | "plan_not_priced"
+  | "invalid_plan_id"
+  | "invalid_items"
+  | "invalid_quantity"
+  | "invalid_start_date"
   // gateway
   | "gateway_not_configured"
   | "gateway_reconnect_required"
@@ -191,6 +206,26 @@ export function humanizeMgdError(error: unknown): string {
     case "amount_mismatch":
     case "currency_mismatch":
       return "The payment amount didn't match the price. Nothing has been charged.";
+    case "plan_upgrade_required":
+      // A billing state at the gym, not anything the visitor did. Crunch holds
+      // a Full-API grant so this should never appear; if it ever does, the
+      // customer still needs a way to complete the thing they came to do.
+      return "Online payment is temporarily unavailable. Please call the gym to book.";
+    case "insufficient_stock":
+      return "There isn't enough stock for one of your items. Adjust the quantity and try again.";
+    case "product_unavailable":
+      return "One of your items is no longer available. Remove it to continue.";
+    case "cart_empty":
+      return "Your cart is empty.";
+    case "plan_not_found":
+      return "That plan is no longer on sale. Refresh the page to see current memberships.";
+    case "plan_not_priced":
+    case "order_not_priced":
+      return "This plan has no price set yet. Contact us and we'll sort it out.";
+    case "order_not_payable":
+      return "This order has already been paid or cancelled.";
+    case "order_not_found":
+      return "We couldn't find that order. Please call the gym before paying again.";
     case "gateway_not_configured":
     case "gateway_reconnect_required":
       return "Online payment is temporarily unavailable. Please call the gym to book.";
