@@ -290,6 +290,81 @@ self-healing: an edit takes up to 5 minutes to appear.
 
 ---
 
+## 0.0.3 Admin auth — email + password
+
+Password is now the primary admin credential. The emailed-code path is retired
+from the UI and email is used only for recovery.
+
+**The admin gate is untouched.** A valid auth session still grants nothing: it
+must be matched by an active `admin_users` row, in the UI and independently in
+every RLS policy via `is_admin()`. Password auth changes who can prove they own
+an inbox, not who is on the roster.
+
+### Enumeration leak — closed
+
+The old form answered "That email doesn't have an account", which is a free
+membership oracle for anyone with a word list. Now every failure returns one
+sentence, and forgot-password reports the same outcome either way. Verified on
+production that a wrong password for a REAL account and any password for a
+made-up address return **byte-identical** copy: *"Those details don't match an
+account."*
+
+### The recovery rail does not use Supabase's own link
+
+Two problems with the stock flow, both real for this client:
+
+1. The project's **Site URL is `http://localhost:3000`** and the production
+   origin is not on the redirect allow-list, so `redirect_to` is silently
+   discarded — every reset link lands on localhost.
+2. Supabase's emailed link points at the raw `bjwcsvpqplsgwkbbvehx.supabase.co`
+   host, which several Indian ISPs block. That is the same reason the app never
+   talks to that host directly (see §0.1).
+
+So `/auth/callback` accepts a `token_hash` and redeems it **on our domain**
+against the proxied custom domain, in addition to the standard `code` exchange.
+The whole round trip stays reachable. The callback also refuses any `next` that
+is not a same-site path, so it cannot be used as an open redirect.
+
+`/reset-password` sits outside the `/admin` gate deliberately: someone setting a
+password for the first time has a session but may not be on the roster, and
+bouncing them to sign-in would make the link useless.
+
+### Verified on production
+
+| check | result |
+|---|---|
+| sign-in form | email + password + "Forgot password?"; no code path |
+| wrong password (real account) | "Those details don't match an account." |
+| any password (unknown address) | **identical** message |
+| recovery link → `/reset-password` | 307 with session cookie set |
+| set password → signed in | "Password set" |
+| signed in, NOT on roster → `/admin` | refused; zero admin nav links |
+| roster row added → `/admin` | full admin UI ("Site settings") |
+| sign out → email + password | signs straight into the admin UI |
+| `POST /auth/v1/recover` | 200 accepted |
+| second call immediately | **429 `over_email_send_rate_limit`** (60s per address) |
+
+Verified with a disposable account (`zz-authprobe@crunchfitness.in`), created
+and deleted; its password was set in the browser and never recorded.
+
+### ⚠️ Founder actions before this is production-ready
+
+1. **Supabase → Auth → URL Configuration.** Set Site URL to the production
+   origin and add the redirect URLs. Until then, "Forgot password?" emails send
+   admins to `localhost:3000`. The setup link below sidesteps this; ordinary
+   password resets do not.
+2. **Custom SMTP is required.** The built-in mailer is for development: it is
+   rate-limited hard (the per-address cooldown above, plus a low project-wide
+   hourly cap) and its deliverability is shared. An admin locked out at 9am
+   should not be waiting on a shared dev mailer. Point Auth at the same provider
+   the site already uses.
+3. Optional but worth it: a **Supabase custom domain** would put
+   `db.crunchfitness.in` in the auth emails themselves. Without it, the link in
+   every Supabase-sent email remains the ISP-blocked raw host — our `token_hash`
+   route only fixes links we generate ourselves.
+
+---
+
 ## 0.0.1 CLIENT-CONTENT-REQUIRED
 
 Everything below was placeholder copy from the design mock that read as a
