@@ -5,10 +5,11 @@ import Link from "next/link";
 import { useEffect, useId, useState } from "react";
 
 import { useLocation } from "@/components/providers/LocationProvider";
-import { Button, ButtonLink } from "@/components/ui/Button";
+import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Field";
 import { Spinner, SuccessMark } from "@/components/ui/Modal";
 import { Heading } from "@/components/ui/Primitives";
+import { MyOrders } from "@/components/account/MyOrders";
 import { isValidEmail } from "@/lib/format";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 
@@ -234,10 +235,9 @@ export function AccountView() {
 }
 
 /**
- * The signed-in view: order history.
+ * The signed-in view: order history, read from the fulfilment mirror.
  *
- * Phase 1 has no orders to show — nothing writes `shop_orders` until Phase 5 —
- * so this is the empty state, which is the honest thing to render.
+ * Scoping is RLS's job, not this component's — see `MyOrders`.
  */
 function SignedIn({
   email,
@@ -279,20 +279,7 @@ function SignedIn({
       </section>
 
       <div className="mx-auto w-full max-w-content px-5 py-9">
-        <div className="rounded-[16px] border border-line bg-surface px-5 py-[52px] text-center">
-          <div className="mb-2 font-display text-[19px] font-semibold uppercase">
-            No orders yet
-          </div>
-          <p className="mx-auto m-0 mb-[18px] max-w-[46ch] text-[13px] leading-[1.6] text-muted">
-            Shop orders placed on this site will appear here with their status,
-            tracking link and GST invoice. Online shop checkout launches in a
-            later phase — until then the counter at {location.short_name} has
-            everything.
-          </p>
-          <ButtonLink href="/shop" size="sm">
-            Browse the shop
-          </ButtonLink>
-        </div>
+        <MyOrders locationName={location.short_name} />
 
         <div className="mt-4 rounded-[16px] border border-accent bg-accent-soft p-6">
           <div className="mb-1.5 font-display text-[19px] font-semibold uppercase">
