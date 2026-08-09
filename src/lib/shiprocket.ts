@@ -65,6 +65,17 @@ export interface ShiprocketTracking {
   raw: unknown;
 }
 
+/**
+ * Live responses return "" where the recorded shapes had null — `awb_code`,
+ * `courier_name` and friends all come back as empty strings on a fresh order.
+ * `??` does not catch that, so an empty string would reach the database and
+ * then render as a blank where the UI expects to fall back to "No AWB yet".
+ */
+function nullIfBlank(value: string | null | undefined): string | null {
+  const trimmed = (value ?? "").trim();
+  return trimmed === "" ? null : trimmed;
+}
+
 export class ShiprocketError extends Error {
   readonly status: number;
   constructor(status: number, message: string) {
@@ -136,14 +147,24 @@ async function call<T>(
   return body as T;
 }
 
+export interface ShiprocketPickupLocation {
+  id: number;
+  /** The NICKNAME, which is what `pickup_location` on an order takes. */
+  name: string;
+  city: string | null;
+  pin: string | null;
+}
+
 export interface ShiprocketClient {
+  listPickupLocations(): Promise<ShiprocketPickupLocation[]>;
   createOrder(input: {
     orderNumber: string;
     placedAt: string;
     billing: ShiprocketAddress;
     lines: ShiprocketLine[];
     subTotal: number;
-    pickupLocation?: string;
+    /** The nickname of a configured pickup address. Required — see above. */
+    pickupLocation: string;
   }): Promise<ShiprocketCreatedOrder>;
   assignAwb(shipmentId: string): Promise<ShiprocketAwb>;
   track(awb: string): Promise<ShiprocketTracking>;
@@ -155,11 +176,42 @@ export interface ShiprocketClient {
  */
 export function shiprocket(fetchImpl: typeof fetch = fetch): ShiprocketClient {
   return {
+    /**
+     * The account's configured pickup addresses.
+     *
+     * An order references one by NICKNAME, not id, and the nickname is
+     * whatever the owner typed — "Home", "Warehouse", anything. There is no
+     * safe default: this client used to guess "Primary", which does not exist
+     * on the real account and would have failed the first real shipment.
+     */
+    async listPickupLocations() {
+      const body = await call<{
+        data?: {
+          shipping_address?: Array<{
+            id?: number;
+            pickup_location?: string;
+            city?: string;
+            pin_code?: string | number;
+          }> | null;
+        };
+      }>("/settings/company/pickup", { method: "GET" }, fetchImpl);
+
+      const rows = body.data?.shipping_address ?? [];
+      return rows
+        .filter((r) => r?.pickup_location)
+        .map((r) => ({
+          id: Number(r.id ?? 0),
+          name: String(r.pickup_location),
+          city: nullIfBlank(r.city),
+          pin: nullIfBlank(r.pin_code == null ? null : String(r.pin_code)),
+        }));
+    },
+
     async createOrder(input) {
       const payload = {
         order_id: input.orderNumber,
         order_date: input.placedAt,
-        pickup_location: input.pickupLocation ?? "Primary",
+        pickup_location: input.pickupLocation,
         billing_customer_name: input.billing.name,
         billing_last_name: "",
         billing_address: input.billing.line1,
@@ -199,9 +251,9 @@ export function shiprocket(fetchImpl: typeof fetch = fetch): ShiprocketClient {
       return {
         orderId: String(body.order_id ?? ""),
         shipmentId: String(body.shipment_id ?? ""),
-        status: body.status ?? null,
-        awb: body.awb_code ?? null,
-        courier: body.courier_name ?? null,
+        status: nullIfBlank(body.status),
+        awb: nullIfBlank(body.awb_code),
+        courier: nullIfBlank(body.courier_name),
       };
     },
 
@@ -221,13 +273,14 @@ export function shiprocket(fetchImpl: typeof fetch = fetch): ShiprocketClient {
       );
 
       const data = body.response?.data;
-      if (!data?.awb_code) {
+      const awb = nullIfBlank(data?.awb_code);
+      if (!awb) {
         throw new ShiprocketError(502, "Shiprocket assigned no AWB");
       }
       return {
-        awb: data.awb_code,
-        courier: data.courier_name ?? null,
-        labelUrl: data.label_url ?? null,
+        awb,
+        courier: nullIfBlank(data?.courier_name),
+        labelUrl: nullIfBlank(data?.label_url),
       };
     },
 
@@ -245,10 +298,10 @@ export function shiprocket(fetchImpl: typeof fetch = fetch): ShiprocketClient {
 
       const track = body.tracking_data?.shipment_track?.[0];
       return {
-        status: body.tracking_data?.shipment_status ?? null,
-        statusDetail: track?.current_status ?? null,
-        deliveredAt: track?.delivered_date ?? null,
-        expectedDeliveryAt: track?.edd ?? null,
+        status: nullIfBlank(body.tracking_data?.shipment_status),
+        statusDetail: nullIfBlank(track?.current_status),
+        deliveredAt: nullIfBlank(track?.delivered_date),
+        expectedDeliveryAt: nullIfBlank(track?.edd),
         raw: body,
       };
     },

@@ -482,6 +482,53 @@ Register `https://<domain>/api/shipping/webhook` in the courier panel.
 
 ---
 
+## 0.0.6 Courier integration — live verification
+
+Auth, account readiness and a full create → verify → cancel, against the real
+account. **No AWB was assigned**, so no freight was drawn from their wallet.
+
+| step | result |
+|---|---|
+| `auth/login` | 200, token issued — company `2344432`, API user `11480963` |
+| pickup locations | **1** — nickname `Home`, id `91301245`, South West Delhi 110070, phone-verified |
+| create order | 200 — order `1506469143`, shipment `1502690143`, status `NEW` |
+| verify | status `NEW`, 1 shipment, no AWB |
+| **cancel** | 200 "Order cancelled successfully." |
+| verify after cancel | status **`CANCELED`** (status_code 5) |
+
+Before the pickup address existed, create returned `400 "Please add
+billing/shipping address first"` — worth recording, because that is the error a
+gym with no configured address will hit, and it is theirs to fix, not ours.
+
+### Live-vs-recorded deltas — two real, both fixed
+
+**1. Empty strings, not nulls.** A fresh order returns `awb_code: ""` and
+`courier_name: ""`. The recorded shapes assumed `null`, and `??` does not catch
+`""` — so an empty string would have reached the database and rendered as a
+blank where the UI falls back to "No AWB yet". All optional string fields now
+normalise blank to null, pinned by a test built from the live payload.
+
+**2. There is no safe default pickup location.** The client defaulted to
+`"Primary"`; the real account calls its only address `"Home"`. That default
+would have failed the first real shipment with a 400. `pickupLocation` is now a
+**required** argument — the compiler found every call site — and the admin
+action resolves it: `SHIPROCKET_PICKUP_LOCATION` if set, otherwise the
+account's first configured address, otherwise a clear refusal naming the
+prerequisite.
+
+Non-deltas: login returns more fields than recorded (client reads only
+`token`); ids arrive as numbers and are carried as strings, as expected; the
+error envelope is `{message, status_code}` as recorded.
+
+### Still gated on a real paid order
+
+AWB assignment, label generation and live tracking. All three draw freight from
+the client's wallet, so they belong in the post-cutover run behind the Razorpay
+domain fix. Parcel dimensions remain placeholders (20×15×10 cm, 1 kg) and want
+real numbers before then.
+
+---
+
 ## 0.0.1 CLIENT-CONTENT-REQUIRED
 
 Everything below was placeholder copy from the design mock that read as a

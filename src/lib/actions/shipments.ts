@@ -72,7 +72,27 @@ export async function createShipment(orderId: string): Promise<ShipmentActionRes
 
   try {
     const client = shiprocket();
+
+    // Resolve the pickup address rather than guessing its name. An explicit
+    // override wins; otherwise take the account's first configured location,
+    // which is the common single-branch case. No location at all is a
+    // Shiprocket-side prerequisite, and saying so beats a 400 from their API.
+    const override = process.env.SHIPROCKET_PICKUP_LOCATION?.trim();
+    let pickupLocation = override || "";
+    if (!pickupLocation) {
+      const locations = await client.listPickupLocations();
+      if (locations.length === 0) {
+        return {
+          ok: false,
+          message:
+            "No pickup address is configured in Shiprocket. Add one in their panel first.",
+        };
+      }
+      pickupLocation = locations[0].name;
+    }
+
     const created = await client.createOrder({
+      pickupLocation,
       orderNumber: row.order_number,
       placedAt: row.placed_at.slice(0, 19).replace("T", " "),
       billing: {

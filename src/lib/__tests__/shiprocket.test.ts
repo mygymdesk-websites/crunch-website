@@ -77,6 +77,7 @@ describe("createOrder", () => {
     const result = await shiprocket(fetchImpl).createOrder({
       orderNumber: "CF-S-1",
       placedAt: "2026-08-09 10:00",
+      pickupLocation: "ZZ Test Pickup",
       billing: {
         name: "Asha Menon",
         phone: "9876543210",
@@ -106,6 +107,54 @@ describe("createOrder", () => {
     expect(result).toMatchObject({ orderId: "1234", shipmentId: "5678" });
   });
 
+  it("normalises the empty strings a real order actually returns", async () => {
+    // RECORDED FROM LIVE. A fresh order comes back with awb_code and
+    // courier_name as "", not null — `??` does not catch that, so an empty
+    // string would reach the database and then render as a blank where the UI
+    // falls back to "No AWB yet".
+    const { fetchImpl } = harness([
+      LOGIN_OK,
+      () => ({
+        body: {
+          order_id: 1506469143,
+          channel_order_id: "ZZ-TEST-1",
+          shipment_id: 1502690143,
+          status: "NEW",
+          status_code: 1,
+          awb_code: "",
+          courier_company_id: "",
+          courier_name: "",
+          new_channel: false,
+          packaging_box_error: "",
+        },
+      }),
+    ]);
+
+    const result = await shiprocket(fetchImpl).createOrder({
+      orderNumber: "CF-S-1",
+      placedAt: "2026-08-09 10:00",
+      pickupLocation: "ZZ Test Pickup",
+      billing: {
+        name: "A",
+        phone: "9876543210",
+        email: "a@b.com",
+        line1: "L1",
+        city: "C",
+        state: "S",
+        postalCode: "999999",
+      },
+      lines: [],
+      subTotal: 0,
+    });
+
+    expect(result.awb).toBeNull();
+    expect(result.courier).toBeNull();
+    expect(result.status).toBe("NEW");
+    // Ids arrive as numbers and are carried as strings.
+    expect(result.orderId).toBe("1506469143");
+    expect(result.shipmentId).toBe("1502690143");
+  });
+
   it("reuses the cached token rather than logging in per call", async () => {
     const { fetchImpl, calls } = harness([
       LOGIN_OK,
@@ -117,6 +166,7 @@ describe("createOrder", () => {
     const args = {
       orderNumber: "CF-S-1",
       placedAt: "2026-08-09 10:00",
+      pickupLocation: "ZZ Test Pickup",
       billing: {
         name: "A",
         phone: "9876543210",
@@ -144,6 +194,7 @@ describe("createOrder", () => {
       shiprocket(fetchImpl).createOrder({
         orderNumber: "CF-S-1",
         placedAt: "2026-08-09 10:00",
+        pickupLocation: "ZZ Test Pickup",
         billing: {
           name: "A",
           phone: "9876543210",
@@ -157,6 +208,48 @@ describe("createOrder", () => {
         subTotal: 0,
       }),
     ).rejects.toBeInstanceOf(ShiprocketError);
+  });
+});
+
+describe("pickup locations", () => {
+  it("reads the nickname, which is what an order actually references", async () => {
+    // RECORDED FROM LIVE. The client used to default to "Primary"; the real
+    // account calls its only address "Home", so that default would have failed
+    // the first real shipment. There is no safe guess — it must be resolved.
+    const { fetchImpl, calls } = harness([
+      LOGIN_OK,
+      () => ({
+        body: {
+          data: {
+            shipping_address: [
+              {
+                id: 91301245,
+                pickup_location: "Home",
+                city: "ZZ Test City",
+                pin_code: 999999,
+                status: 2,
+              },
+            ],
+            recent_addresses: [],
+          },
+        },
+      }),
+    ]);
+
+    const locations = await shiprocket(fetchImpl).listPickupLocations();
+    expect(calls[1].url).toContain("/settings/company/pickup");
+    expect(locations).toEqual([
+      { id: 91301245, name: "Home", city: "ZZ Test City", pin: "999999" },
+    ]);
+  });
+
+  it("returns an empty list when the account has no address configured", async () => {
+    // The live shape for "none configured" is a null, not an empty array.
+    const { fetchImpl } = harness([
+      LOGIN_OK,
+      () => ({ body: { data: { shipping_address: null, recent_addresses: [] } } }),
+    ]);
+    await expect(shiprocket(fetchImpl).listPickupLocations()).resolves.toEqual([]);
   });
 });
 
