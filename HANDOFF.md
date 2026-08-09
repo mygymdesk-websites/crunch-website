@@ -358,7 +358,13 @@ and deleted; its password was set in the browser and never recorded.
    hourly cap) and its deliverability is shared. An admin locked out at 9am
    should not be waiting on a shared dev mailer. Point Auth at the same provider
    the site already uses.
-3. Optional but worth it: a **Supabase custom domain** would put
+3. **Set the password minimum to 8** in Supabase → Auth → Policies. The reset
+   form enforces 8 (the NIST SP 800-63B floor), but that check runs in the
+   browser — Supabase's own default is 6, so until the project setting matches,
+   the form is the only thing holding the line and the Auth API would accept a
+   shorter one. Worth enabling the leaked-password (HIBP) check at the same
+   time: it catches `Crunchfitness@2026` in a way no length rule will.
+4. Optional but worth it: a **Supabase custom domain** would put
    `db.crunchfitness.in` in the auth emails themselves. Without it, the link in
    every Supabase-sent email remains the ISP-blocked raw host — our `token_hash`
    route only fixes links we generate ourselves.

@@ -20,8 +20,13 @@ import { getBrowserSupabase } from "@/lib/supabase/browser";
  * A minimum length is enforced and nothing else. Composition rules push people
  * toward `Password1!` and towards reuse; length is the property that actually
  * costs an attacker anything.
+ *
+ * 8 is the NIST SP 800-63B floor for a user-chosen secret. It must be mirrored
+ * in Supabase → Auth → Policies: this check runs in the browser, so on its own
+ * it is a suggestion that anyone calling the Auth API directly can walk around.
+ * One number, enforced in both places, rather than two that drift.
  */
-const MIN_LENGTH = 12;
+const MIN_LENGTH = 8;
 
 export function ResetPassword({ signedIn }: { signedIn: boolean }) {
   const router = useRouter();
