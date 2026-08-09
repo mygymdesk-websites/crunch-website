@@ -335,11 +335,13 @@ export interface BookingResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Phase 4–5 — NOT YET LIVE on the platform (PRD §3, Track A).
+// Shop checkout + membership purchase  *(1.5, LIVE)*
 //
-// Shapes are specified so the website side is a data-source swap when the MGD
-// endpoints deploy, not a rebuild. Calling these today throws
-// MgdNotYetLiveError rather than issuing a request against a 404.
+// These shapes were SPECULATED in Phase 1 and several guesses were wrong — the
+// worst being shop `amount`, which is rupees here with paise in a separate
+// field, not the minor-unit figure the guess assumed. They are now written
+// from the v1.6 reference. Anything still marked speculative in this file
+// should be treated the same way: verified before it carries money.
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -431,75 +433,124 @@ export interface ProductQuery {
 
 /** A2 — `POST website-shop-order-create`. */
 export interface ShopOrderCreateRequest {
-  items: Array<{ product_id: string; qty: number }>;
-  location_id: string;
+  items: Array<{ product_id: string; quantity: number }>;
+  /**
+   * REQUIRED, and the API's only notion of place: it is the branch that
+   * fulfils the order and whose stock is checked and decremented.
+   *
+   * The API has no delivery concept at all. For a courier order the website
+   * sends the fulfilling branch here and keeps the shipping address in the
+   * LOCAL mirror only — MyGymDesk never sees it. See `src/app/api/shop`.
+   */
+  pickup_location_id: string;
   customer: MgdCustomer;
 }
 
 export interface ShopOrderCreateResponse {
   order_id: string;
-  /** MINOR units (paise). */
+  /** Gym-facing reference, e.g. "FZ-1042". */
+  order_number: string;
+  /** MAJOR units (rupees). Display this one. */
   amount: number;
+  /** MINOR units (paise). This is the one Razorpay Checkout takes. */
+  amount_in_paise: number;
   currency: Currency;
+  gateway: string;
+  razorpay_order_id: string;
   key_id: string;
+  test_mode: boolean;
+  collection_method: "own_pg" | "oauth" | (string & {});
+  pickup_location_id: string;
+  pickup_location_name: string | null;
+  lines: Array<{
+    product_id: string;
+    name: string;
+    quantity: number;
+    unit_price: number;
+    total: number;
+  }>;
 }
 
-/** A2 — `POST website-shop-order` (post-payment confirm). */
+/** `POST website-shop-order` — finalize after payment. Budget-exempt. */
 export interface ShopOrderConfirmRequest {
   order_id: string;
   payment: BookingPayment;
-  customer: MgdCustomer;
 }
 
 export interface ShopOrderConfirmResponse {
   ok: true;
-  sale_id: string;
+  order_id: string;
+  order_number: string;
   invoice_id: string | null;
-  payment_id: string;
-  currency: Currency;
+  invoice_number: string | null;
+  status: "paid" | (string & {});
   amount_charged: number;
-  location_id: string | null;
-  location_name: string | null;
-  items: Array<{
-    product_id: string;
-    name: string;
-    qty: number;
-    unit_price: number;
-    line_total: number;
-  }>;
+  currency: Currency;
+  /**
+   * Stock ran out between create and pay. The order is STILL PAID and is not
+   * auto-refunded — the gym reconciles it. Never render this as a failure.
+   */
+  oversold: boolean;
+  member_id: string | null;
+  pickup_location_id: string | null;
+  pickup_location_name: string | null;
+  /** Present when the same capture was replayed. */
+  already?: boolean;
 }
 
-/** A3 — `POST website-membership-order`. */
+/** `POST website-membership-order`. */
 export interface MembershipOrderRequest {
   plan_id: string;
   customer: MgdCustomer;
+  /** ISO date, today..+90d. Omitted means today. A renewer should pass their
+   *  current end date so the new subscription starts where the old one ends. */
+  start_date?: string;
+  location_id?: string;
 }
 
 export interface MembershipOrderResponse {
+  /** KEEP THIS — it is what the purchase call takes, not `order_id`. */
+  purchase_id: string;
+  /** The Razorpay order id. */
   order_id: string;
-  /** MINOR units (paise). */
+  /** MINOR units (paise). May exceed the plan price when the gym charges an
+   *  online-payment fee — present it as the total. */
   amount: number;
   currency: Currency;
   key_id: string;
+  test_mode: boolean;
+  collection_method: "own_pg" | "oauth" | (string & {});
+  plan_id: string;
+  plan_name: string;
+  duration_days: number;
+  location_id: string | null;
+  location_name: string | null;
 }
 
-/** A3 — `POST website-membership-purchase` (post-payment confirm). */
+/** `POST website-membership-purchase` — finalize after payment. Budget-exempt. */
 export interface MembershipPurchaseRequest {
-  plan_id: string;
-  customer: MgdCustomer;
+  /** The `purchase_id` from the order call. The field is named `order_id`. */
+  order_id: string;
   payment: BookingPayment;
-  /** Optional GSTIN for a company invoice. */
-  gstin?: string;
 }
 
 export interface MembershipPurchaseResponse {
   ok: true;
   member_id: string;
   subscription_id: string;
-  invoice_id: string;
-  payment_id: string;
+  invoice_id: string | null;
+  invoice_number: string | null;
+  status: "active" | (string & {});
+  plan_name: string;
+  /** ISO dates. Surface both — for a renewal this is the new term, and it is
+   *  the only thing that tells a renewer what they just bought. */
+  start_date: string;
+  end_date: string;
   amount_charged: number;
   currency: Currency;
+  member_portal: { provisioned: boolean };
   location_id: string | null;
   location_name: string | null;
+  /** Present when the same capture was replayed. */
+  idempotent?: boolean;
 }

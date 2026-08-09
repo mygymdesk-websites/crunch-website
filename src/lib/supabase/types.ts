@@ -163,6 +163,8 @@ export interface ShopOrder {
   order_number: string;
   mgd_sale_id: string | null;
   mgd_invoice_id: string | null;
+  /** The gym's own reference (FZ-…) — what a customer will quote on the phone. */
+  mgd_order_number: string | null;
   payment_gateway: string;
   payment_order_id: string | null;
   payment_capture_id: string | null;
@@ -184,6 +186,11 @@ export interface ShopOrder {
   grand_total: number;
   promo_code: string | null;
   notes: string | null;
+  /**
+   * Stock ran out between order-create and payment. Paid, never auto-refunded;
+   * a human confirms availability before dispatch.
+   */
+  oversold: boolean;
   placed_at: string;
   packed_at: string | null;
   dispatched_at: string | null;

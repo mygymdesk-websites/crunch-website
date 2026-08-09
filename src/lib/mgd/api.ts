@@ -3,7 +3,6 @@ import {
   MgdClient,
   type MgdClientOptions,
 } from "./client";
-import { MgdNotYetLiveError } from "./errors";
 import type {
   BookingOrderRequest,
   BookingOrderResponse,
@@ -299,51 +298,76 @@ export class MgdApi {
   }
 
   // -------------------------------------------------------------------------
-  // NOT YET LIVE — Track A, Phases 4–5.
-  //
-  // Typed so Phase 4/5 is a swap of the data source, not a rebuild. Each one
-  // throws MgdNotYetLiveError today; when the endpoint deploys, delete the
-  // throw and uncomment the request line beneath it.
+  // Shop checkout (1.5)
   // -------------------------------------------------------------------------
 
-  /** A2 — create a Razorpay order for a shop cart. Lands in Phase 5. */
+  /**
+   * Create a shop order and its Razorpay order.
+   *
+   * Prices are resolved server-side from the same all-in figures the products
+   * endpoint displays; the client sends quantities only. Stock is checked per
+   * line at the pickup branch first, so `409 insufficient_stock` arrives with
+   * `{ product_id, available }` BEFORE any money moves.
+   *
+   * Note the two amounts in the response: `amount` is rupees for display,
+   * `amount_in_paise` is what Checkout takes. Confusing them is a 100x bug.
+   */
   async createShopOrder(
     input: ShopOrderCreateRequest,
   ): Promise<ShopOrderCreateResponse> {
-    void input;
-    throw new MgdNotYetLiveError(
+    return this.client.request<ShopOrderCreateResponse>(
       "website-shop-order-create",
-      "Phase 5 (Track A · A2)",
+      { method: "POST", body: input },
     );
   }
 
-  /** A2 — confirm a shop order post-payment. Lands in Phase 5. */
+  /**
+   * Finalize a shop order after payment. Budget-exempt.
+   *
+   * `oversold: true` is NOT a failure — stock ran out between create and pay,
+   * the order is still paid, and the gym reconciles it. Replaying the same
+   * capture returns the same result with `already: true`.
+   */
   async confirmShopOrder(
     input: ShopOrderConfirmRequest,
   ): Promise<ShopOrderConfirmResponse> {
-    void input;
-    throw new MgdNotYetLiveError("website-shop-order", "Phase 5 (Track A · A2)");
+    return this.client.request<ShopOrderConfirmResponse>("website-shop-order", {
+      method: "POST",
+      body: input,
+    });
   }
 
-  /** A3 — create a Razorpay order for a membership plan. Lands in Phase 4. */
+  // -------------------------------------------------------------------------
+  // Membership purchase (1.5)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Start a membership purchase. Keep the `purchase_id` from the response —
+   * it is what the finalize call takes, under the name `order_id`.
+   */
   async createMembershipOrder(
     input: MembershipOrderRequest,
   ): Promise<MembershipOrderResponse> {
-    void input;
-    throw new MgdNotYetLiveError(
+    return this.client.request<MembershipOrderResponse>(
       "website-membership-order",
-      "Phase 4 (Track A · A3)",
+      { method: "POST", body: input },
     );
   }
 
-  /** A3 — activate a membership post-payment. Lands in Phase 4. */
+  /**
+   * Finalize a membership purchase after payment. Budget-exempt.
+   *
+   * Provisions the member, an active subscription, the invoice and Member App
+   * access. A repeat purchase by an existing member is a RENEWAL — a new
+   * subscription, never an error — so the returned start/end dates are the
+   * only thing that tells a renewer what they actually bought.
+   */
   async purchaseMembership(
     input: MembershipPurchaseRequest,
   ): Promise<MembershipPurchaseResponse> {
-    void input;
-    throw new MgdNotYetLiveError(
+    return this.client.request<MembershipPurchaseResponse>(
       "website-membership-purchase",
-      "Phase 4 (Track A · A3)",
+      { method: "POST", body: input },
     );
   }
 }

@@ -56,8 +56,12 @@ interface CartContextValue {
 
 const CartContext = createContext<CartContextValue | null>(null);
 
-/** Per-line cap, matching the design's quantity stepper. */
-const MAX_QTY = 10;
+/**
+ * Per-line cap. 99 is the API's own bound (`invalid_quantity` above it), so the
+ * cart refuses what checkout would refuse rather than letting someone build a
+ * basket that cannot be ordered.
+ */
+const MAX_QTY = 99;
 
 function snapshotOf(product: MgdProduct): CartSnapshot {
   return {
@@ -116,6 +120,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [lines, hydrated]);
 
   const add = useCallback((product: MgdProduct, qty = 1) => {
+    // Both add buttons already disable on out-of-stock; this is the choke point
+    // that makes it true regardless of which surface calls in. Ordering one is
+    // a 422 at checkout, so keeping it out of the cart is the honest failure.
+    if (product.stockStatus === "out_of_stock") return;
+
     setLines((current) => {
       const existing = current.find((l) => l.productId === product.id);
       if (existing) {

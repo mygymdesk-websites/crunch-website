@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { MgdApi } from "../api";
 import { MgdClient } from "../client";
-import { MgdError, MgdNotConfiguredError, MgdNotYetLiveError } from "../errors";
+import { MgdError, MgdNotConfiguredError } from "../errors";
 
 /**
  * The MGD layer is unit-testable without a network: `fetchImpl` is injected.
@@ -349,23 +349,83 @@ describe("member pricing removal (v1.3)", () => {
   });
 });
 
-describe("phase 5 endpoints still stubbed", () => {
-  it.each([
-    ["createShopOrder", () => api().api.createShopOrder({ items: [], location_id: "l", customer: { name: "A", phone: "p", email: "e" } })],
-    ["createMembershipOrder", () => api().api.createMembershipOrder({ plan_id: "p", customer: { name: "A", phone: "p", email: "e" } })],
-  ])("%s throws MgdNotYetLiveError instead of hitting a 404", async (_name, call) => {
-    await expect(call()).rejects.toBeInstanceOf(MgdNotYetLiveError);
+describe("shop + membership request shapes (1.5/1.6)", () => {
+  it("sends pickup_location_id and quantity, not location_id and qty", async () => {
+    // Phase 1 guessed these names and guessed wrong. The API rejects `qty`
+    // outright, and `location_id` would simply be ignored — an order with no
+    // branch, whose stock check silently never happened.
+    const { api: client, calls } = api(() => ({ body: { order_id: "o" } }));
+
+    await client.createShopOrder({
+      items: [{ product_id: "p1", quantity: 2 }],
+      pickup_location_id: "loc-1",
+      customer: { name: "Asha", phone: "+919876543210", email: "a@b.com" },
+    });
+
+    expect(calls[0].url).toContain("website-shop-order-create");
+    const body = JSON.parse(calls[0].init.body as string);
+    expect(body.pickup_location_id).toBe("loc-1");
+    expect(body.items[0]).toEqual({ product_id: "p1", quantity: 2 });
+    expect(body).not.toHaveProperty("location_id");
   });
 
-  it("does not issue a network request for a not-yet-live endpoint", async () => {
-    const { api: client, calls } = api();
-    await client
-      .createMembershipOrder({
-        plan_id: "p",
-        customer: { name: "A", phone: "p", email: "e" },
-      })
-      .catch(() => {});
-    expect(calls).toHaveLength(0);
+  it("finalizes a shop order without echoing the customer back", async () => {
+    const { api: client, calls } = api(() => ({ body: { ok: true } }));
+
+    await client.confirmShopOrder({
+      order_id: "ord-1",
+      payment: {
+        gateway: "razorpay",
+        order_id: "order_x",
+        capture_id: "pay_x",
+        signature: "sig",
+      },
+    });
+
+    expect(calls[0].url).toContain("website-shop-order");
+    const body = JSON.parse(calls[0].init.body as string);
+    expect(body).toEqual({
+      order_id: "ord-1",
+      payment: {
+        gateway: "razorpay",
+        order_id: "order_x",
+        capture_id: "pay_x",
+        signature: "sig",
+      },
+    });
+  });
+
+  it("passes start_date and location_id on a membership order when given", async () => {
+    const { api: client, calls } = api(() => ({ body: { purchase_id: "pu" } }));
+
+    await client.createMembershipOrder({
+      plan_id: "plan-1",
+      customer: { name: "Asha", phone: "+919876543210", email: "a@b.com" },
+      start_date: "2026-09-01",
+      location_id: "loc-1",
+    });
+
+    expect(calls[0].url).toContain("website-membership-order");
+    const body = JSON.parse(calls[0].init.body as string);
+    expect(body.plan_id).toBe("plan-1");
+    expect(body.start_date).toBe("2026-09-01");
+    expect(body.location_id).toBe("loc-1");
+  });
+
+  it("finalizes a membership with the purchase_id under the name order_id", async () => {
+    // The finalize endpoint takes the purchase_id from the order call, in a
+    // field called `order_id` — NOT the Razorpay order id, which also lives in
+    // that response under `order_id`. Sending the wrong one is a 404.
+    const { api: client, calls } = api(() => ({ body: { ok: true } }));
+
+    await client.purchaseMembership({
+      order_id: "purchase-123",
+      payment: { gateway: "razorpay", order_id: "order_x", capture_id: "pay_x" },
+    });
+
+    expect(calls[0].url).toContain("website-membership-purchase");
+    const body = JSON.parse(calls[0].init.body as string);
+    expect(body.order_id).toBe("purchase-123");
   });
 });
 
