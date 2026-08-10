@@ -4,7 +4,6 @@ import { useLocation } from "@/components/providers/LocationProvider";
 import { CoverImage } from "@/components/ui/CoverImage";
 import { Badge, Container, Eyebrow, Heading } from "@/components/ui/Primitives";
 import { formatPhone } from "@/lib/format";
-import { LOCATION_IMAGES } from "@/lib/fixtures/site-content";
 import { formatAddress } from "@/lib/location-format";
 
 /**
@@ -48,7 +47,7 @@ export function LocationPicker() {
             >
               <div className="h-[200px] overflow-hidden">
                 <CoverImage
-                  src={LOCATION_IMAGES[option.slug]}
+                  src={option.card_image_url}
                   alt={`${option.short_name} gym floor`}
                   placeholderLabel={`gym floor — ${option.short_name.toLowerCase()}`}
                 />

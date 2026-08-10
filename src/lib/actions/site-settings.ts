@@ -88,6 +88,10 @@ export async function updateLocation(
       facebook: text(form, "social_facebook"),
       whatsapp: text(form, "social_whatsapp"),
     },
+    // Uploaded via the image picker, which writes the resulting public URL
+    // into a hidden field — the form still saves plain strings.
+    card_image_url: text(form, "card_image_url"),
+    hero_image_url: text(form, "hero_image_url"),
     mgd_location_id: text(form, "mgd_location_id"),
     // Uppercased because the CHECK constraint expects the canonical form, and
     // people type GSTINs in lower case. Blank stays NULL so the footer omits

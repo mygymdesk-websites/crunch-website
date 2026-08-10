@@ -87,6 +87,10 @@ export const HERO_IMAGE: string | null = null;
 export const ABOUT_HERO_IMAGE: string | null = null;
 
 /** Photos used on the location cards, keyed by location slug. */
+/**
+ * MOVED TO THE DATABASE — `site_settings.card_image_url`, managed per branch
+ * from Admin → Site settings. Nothing reads this.
+ */
 export const LOCATION_IMAGES: Record<string, string> = {};
 
 export interface Stat {

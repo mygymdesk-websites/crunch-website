@@ -94,6 +94,8 @@ export interface SiteLocation {
   is_default: boolean;
   display_order: number;
   hero_image_url: string | null;
+  /** Thumbnail on the location cards. Null renders the striped placeholder. */
+  card_image_url: string | null;
 }
 
 /** The full row, including presentation state. Admin surfaces only. */

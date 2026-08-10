@@ -28,7 +28,8 @@ const PUBLIC_COLUMNS = `
   phone, whatsapp, email,
   hours_summary, hours, closed_note,
   map_embed_url, map_link_url, latitude, longitude,
-  socials, mgd_location_id, gstin, is_default, display_order, hero_image_url
+  socials, mgd_location_id, gstin, is_default, display_order, hero_image_url,
+  card_image_url
 `;
 
 interface SeedLocation {
@@ -57,6 +58,8 @@ interface SeedLocation {
   is_default: boolean;
   display_order: number;
   hero_image_url: string | null;
+  /** Optional: the seed predates client-managed imagery. */
+  card_image_url?: string | null;
 }
 
 function fromSeed(): SiteLocation[] {
@@ -94,6 +97,7 @@ function fromSeed(): SiteLocation[] {
       is_default: row.is_default,
       display_order: row.display_order,
       hero_image_url: row.hero_image_url ?? null,
+      card_image_url: row.card_image_url ?? null,
     }))
     .sort(byDisplayOrder);
 }

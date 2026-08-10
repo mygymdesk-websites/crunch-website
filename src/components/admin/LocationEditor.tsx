@@ -2,8 +2,10 @@
 
 import { useState, useTransition } from "react";
 
+import { uploadImage } from "@/lib/actions/content";
 import { updateLocation } from "@/lib/actions/site-settings";
 import { Button } from "@/components/ui/Button";
+import { CoverImage } from "@/components/ui/CoverImage";
 import { Input } from "@/components/ui/Field";
 import { Heading } from "@/components/ui/Primitives";
 import type { SiteLocationAdmin } from "@/lib/supabase/types";
@@ -276,6 +278,23 @@ export function LocationEditor({
         />
       </FieldSet>
 
+      <FieldSet legend="Photography">
+        <ImageField
+          name="card_image_url"
+          label="Card photo"
+          hint="The thumbnail on the location picker. Blank renders the striped placeholder."
+          initial={location.card_image_url}
+          canEdit={canEdit}
+        />
+        <ImageField
+          name="hero_image_url"
+          label="Branch hero"
+          hint="Used where this gym has a page of its own."
+          initial={location.hero_image_url}
+          canEdit={canEdit}
+        />
+      </FieldSet>
+
       <FieldSet legend="MyGymDesk & display">
         <Input
           id={`${location.id}-mgd`}
@@ -355,5 +374,82 @@ function FieldSet({
         {children}
       </div>
     </fieldset>
+  );
+}
+
+/**
+ * An image picker that still saves through the surrounding form.
+ *
+ * Upload happens immediately — the file goes to storage and comes back as a
+ * public URL — but the URL is then held in a hidden input, so the branch is
+ * only actually repointed when the admin saves the card. That keeps one Save
+ * button meaning one thing, rather than some fields committing on their own.
+ */
+function ImageField({
+  name,
+  label,
+  hint,
+  initial,
+  canEdit,
+}: {
+  name: string;
+  label: string;
+  hint: string;
+  initial: string | null;
+  canEdit: boolean;
+}) {
+  const [url, setUrl] = useState(initial ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <div className="grid gap-2">
+      <input type="hidden" name={name} value={url} />
+      <div className="text-[11px] font-bold uppercase tracking-[.08em] text-muted">
+        {label}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="h-[64px] w-[96px] shrink-0 overflow-hidden rounded-field">
+          <CoverImage src={url || null} alt="" placeholderLabel="no photo" />
+        </span>
+
+        {canEdit ? (
+          <>
+            <label className="cursor-pointer rounded-pill border border-line px-4 py-2 text-[11px] font-bold uppercase tracking-[.08em]">
+              {busy ? "Uploading…" : url ? "Replace" : "Upload"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/avif"
+                className="sr-only"
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+                  setBusy(true);
+                  setError(null);
+                  const data = new FormData();
+                  data.set("file", file);
+                  const result = await uploadImage(data);
+                  if (!result.ok) setError(result.message);
+                  else if (result.url) setUrl(result.url);
+                  setBusy(false);
+                }}
+              />
+            </label>
+            {url ? (
+              <button
+                type="button"
+                onClick={() => setUrl("")}
+                className="cursor-pointer border-0 bg-transparent text-[11px] uppercase tracking-[.08em] text-muted underline"
+              >
+                Remove
+              </button>
+            ) : null}
+          </>
+        ) : null}
+      </div>
+
+      <p className="m-0 text-[12px] leading-[1.5] text-muted">{error ?? hint}</p>
+    </div>
   );
 }
