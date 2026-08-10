@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Crunch Fitness">
+  <!--
+    The wordmark's accent square, on its own.
+
+    Same shape and same token as `Logo`: a square skewed -12deg in #ff3d14.
+    The accent is identical in light and dark, so one icon serves both themes,
+    and the background stays transparent so it sits on whatever the browser
+    chrome is rather than carrying a ground of its own.
+
+    Deliberately near-edge-to-edge: at 16px a small mark with generous margins
+    reads as a smudge.
+  -->
+  <rect x="4" y="4" width="24" height="24" fill="#ff3d14"
+        transform="skewX(-12)" transform-origin="16 16" />
+</svg>
