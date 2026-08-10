@@ -4,6 +4,7 @@ import { revalidatePath, updateTag } from "next/cache";
 
 import { canEditSettings, getAdminGate } from "@/lib/admin-auth";
 import { SITE_SETTINGS_TAG } from "@/lib/site-settings";
+import { mapEmbedSrc } from "@/lib/location-format";
 import { getServerSupabase } from "@/lib/supabase/server";
 import type { OpeningHoursRow } from "@/lib/supabase/types";
 
@@ -81,7 +82,10 @@ export async function updateLocation(
     hours_summary: text(form, "hours_summary"),
     hours: hoursFrom(form),
     closed_note: text(form, "closed_note"),
-    map_embed_url: text(form, "map_embed_url"),
+    // Normalised on the way in, so the column holds a src rather than whatever
+    // Google's Embed tab put on the clipboard. Anything that is not a Maps
+    // embed becomes null and the card falls back to its placeholder.
+    map_embed_url: mapEmbedSrc(text(form, "map_embed_url")),
     map_link_url: text(form, "map_link_url"),
     socials: {
       instagram: text(form, "social_instagram"),

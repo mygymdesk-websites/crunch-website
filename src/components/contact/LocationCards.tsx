@@ -3,7 +3,7 @@
 import { useLocation } from "@/components/providers/LocationProvider";
 import { Badge, Heading } from "@/components/ui/Primitives";
 import { formatPhone } from "@/lib/format";
-import { formatAddress, mapPlaceholderLabel } from "@/lib/location-format";
+import { formatAddress, mapEmbedSrc, mapPlaceholderLabel } from "@/lib/location-format";
 
 /**
  * One card per location, straight from `site_settings`.
@@ -27,9 +27,9 @@ export function LocationCards() {
             }`}
           >
             <div className="relative h-[190px] border-b border-line">
-              {entry.map_embed_url ? (
+              {mapEmbedSrc(entry.map_embed_url) ? (
                 <iframe
-                  src={entry.map_embed_url}
+                  src={mapEmbedSrc(entry.map_embed_url) ?? undefined}
                   title={`Map of ${entry.name}`}
                   loading="lazy"
                   referrerPolicy="no-referrer-when-downgrade"

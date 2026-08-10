@@ -237,10 +237,10 @@ export function LocationEditor({
         <Input
           id={`${location.id}-embed`}
           name="map_embed_url"
-          label="Google Maps embed URL"
+          label="Google Maps embed"
           showLabel
           defaultValue={location.map_embed_url ?? ""}
-          hint="The src from Maps → Share → Embed. Blank shows a placeholder."
+          hint="Paste the whole embed code from Maps → Share → Embed a map, or just its URL — either works. A share link (maps.app.goo.gl) is NOT an embed and belongs in the field below. Blank shows a placeholder."
           disabled={!canEdit}
         />
         <Input

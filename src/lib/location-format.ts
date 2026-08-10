@@ -61,3 +61,38 @@ export function mailtoLink(location: SiteLocation): string {
 export function mapPlaceholderLabel(location: SiteLocation): string {
   return `map — ${location.short_name}, ${location.city}`.toLowerCase();
 }
+
+/**
+ * Turns whatever someone pasted into a usable Google Maps embed src.
+ *
+ * Google's "Embed a map" tab hands you a full `<iframe …>` snippet, not a URL,
+ * so that is what people paste — and an iframe whose src is itself an iframe
+ * tag resolves as a relative path, which quietly loads the site inside its own
+ * map frame. Accepting both forms is cheaper than expecting everyone to dig
+ * the src out by hand, and far cheaper than the bug.
+ *
+ * Restricted to Google's embed host on purpose: this value becomes the src of
+ * a frame on a public page, and "an admin pasted something odd" should fail
+ * closed rather than embed an arbitrary site.
+ */
+export function mapEmbedSrc(value: string | null | undefined): string | null {
+  const raw = (value ?? "").trim();
+  if (!raw) return null;
+
+  // Pull the src out of an iframe snippet; otherwise treat it as a bare URL.
+  const match = raw.match(/<iframe[^>]*\ssrc=["']([^"']+)["']/i);
+  const candidate = (match ? match[1] : raw).trim();
+
+  let url: URL;
+  try {
+    url = new URL(candidate);
+  } catch {
+    return null;
+  }
+
+  const host = url.hostname.toLowerCase();
+  const googleHost = host === "google.com" || host.endsWith(".google.com");
+  if (!googleHost || !url.pathname.startsWith("/maps/embed")) return null;
+
+  return url.toString();
+}
