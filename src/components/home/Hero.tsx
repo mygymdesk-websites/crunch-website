@@ -4,7 +4,8 @@ import { useLocation } from "@/components/providers/LocationProvider";
 import { useTrialModal } from "@/components/providers/TrialModalProvider";
 import { ButtonLink } from "@/components/ui/Button";
 import { CoverImage } from "@/components/ui/CoverImage";
-import { HERO_IMAGE, HERO_STATS } from "@/lib/fixtures/site-content";
+import type { SiteImage } from "@/lib/trainers";
+import { HERO_STATS } from "@/lib/fixtures/site-content";
 
 /**
  * The homepage hero, ported from the design's documented hero pattern:
@@ -15,7 +16,7 @@ import { HERO_IMAGE, HERO_STATS } from "@/lib/fixtures/site-content";
  *
  * The "Two Locations" badge counts `site_settings` rather than saying "two".
  */
-export function Hero() {
+export function Hero({ image }: { image: SiteImage | null }) {
   const { locations, location } = useLocation();
   const { openTrial } = useTrialModal();
 
@@ -133,8 +134,8 @@ export function Hero() {
             />
             <div className="absolute inset-[13%] overflow-hidden rounded-full border border-line bg-surface2">
               <CoverImage
-                src={HERO_IMAGE}
-                alt="Athlete training with a dumbbell"
+                src={image?.url ?? null}
+                alt={image?.alt || "Athlete training with a dumbbell"}
                 placeholderLabel="gym floor photo"
                 eager
               />

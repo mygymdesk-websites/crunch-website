@@ -22,6 +22,7 @@ import {
 } from "@/lib/content";
 import { LOCATION_STORAGE_KEY, SITE_DESCRIPTION, SITE_NAME } from "@/lib/site";
 import { getLocations, resolveLocation } from "@/lib/site-settings";
+import { getSiteImages, getTrainers } from "@/lib/trainers";
 
 /**
  * The homepage title names the gyms, so it is built from `site_settings`
@@ -63,19 +64,22 @@ export default async function HomePage() {
   // fully rendered for crawlers.
   // getPlans and getPtPlans read the SAME cached `resource=plans` response,
   // so asking for both costs one MyGymDesk request, not two.
-  const [classes, plans, ptPlans, products] = await Promise.all([
+  const [classes, plans, ptPlans, products, trainers, images] = await Promise.all([
     getClassCatalog(location),
     getPlans(location),
     getPtPlans(location),
     getProducts(location),
+    // Client-managed content: coaches and the hero photograph.
+    getTrainers(),
+    getSiteImages(),
   ]);
 
   return (
     <>
-      <Hero />
+      <Hero image={images.home_hero ?? null} />
       <LocationPicker />
       <HomeClasses classes={classes.data} />
-      <HomeTrainers />
+      <HomeTrainers trainers={trainers} />
       <HomeWhyUs />
       <HomePackages plans={plans.data} ptPlans={ptPlans.data} />
       <ShopStrip products={products.data.products} />

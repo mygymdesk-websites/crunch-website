@@ -23,11 +23,11 @@ import {
   APPOINTMENT_TIMEFRAMES,
   SOCIAL_TILES,
   TESTIMONIALS,
-  TRAINERS,
   TRUST_BARS,
   WHY_US,
 } from "@/lib/fixtures/site-content";
 import type { MgdClassType, MgdPlan } from "@/lib/mgd/types";
+import type { Trainer } from "@/lib/trainers";
 import { useEnquiry, validateEnquiry } from "@/lib/use-enquiry";
 
 /**
@@ -68,10 +68,11 @@ export function HomeClasses({ classes }: { classes: MgdClassType[] }) {
 }
 
 /** Coach portraits. The first card carries the accent ring, per the design. */
-export function HomeTrainers() {
-  // Hidden until the client confirms each coach's role and branch. Publishing
-  // a real person under an invented job title is not a small error.
-  if (TRAINERS.length === 0) return null;
+export function HomeTrainers({ trainers }: { trainers: Trainer[] }) {
+  // Still hidden when there is nothing to show — a section heading above an
+  // empty grid is worse than no section. The difference now is that filling it
+  // is a job for the admin panel rather than a code change.
+  if (trainers.length === 0) return null;
 
   return (
     <Section band="surface" className="mt-[76px]">
@@ -88,15 +89,15 @@ export function HomeTrainers() {
         </div>
 
         <div className="grid grid-cols-[repeat(auto-fit,minmax(210px,1fr))] gap-6">
-          {TRAINERS.map((trainer, index) => (
-            <div key={trainer.name} className="text-center">
+          {trainers.map((trainer, index) => (
+            <div key={trainer.id} className="text-center">
               <div
                 className={`mx-auto mb-4 aspect-square w-[min(200px,60vw)] overflow-hidden rounded-full border-[3px] p-[5px] ${
                   index === 0 ? "border-accent" : "border-line"
                 }`}
               >
                 <CoverImage
-                  src={trainer.image}
+                  src={trainer.image_url}
                   alt={trainer.name}
                   placeholderLabel={trainer.name.toLowerCase()}
                   className="overflow-hidden rounded-full"
@@ -111,9 +112,11 @@ export function HomeTrainers() {
               >
                 {trainer.name}
               </div>
-              <div className="mt-1 text-[13px] text-muted">{trainer.role}</div>
+              {trainer.role ? (
+                <div className="mt-1 text-[13px] text-muted">{trainer.role}</div>
+              ) : null}
               <div className="mt-2 text-[11px] uppercase tracking-[.1em] text-muted opacity-80">
-                <LocationName slug={trainer.locationSlug} />
+                <LocationName id={trainer.location_id} />
               </div>
             </div>
           ))}
@@ -124,9 +127,11 @@ export function HomeTrainers() {
 }
 
 /** Renders a location's short name from its slug — never hardcoded. */
-function LocationName({ slug }: { slug: string }) {
+/** A coach with no branch floats across all of them, which is the common case. */
+function LocationName({ id }: { id: string | null }) {
   const { locations } = useLocation();
-  return <>{locations.find((l) => l.slug === slug)?.short_name ?? ""}</>;
+  if (!id) return <>All branches</>;
+  return <>{locations.find((l) => l.id === id)?.short_name ?? ""}</>;
 }
 
 /** The numbered 01–04 "why us" block. No icons, per the design system. */

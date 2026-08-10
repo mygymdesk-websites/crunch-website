@@ -36,11 +36,13 @@ export interface Trainer {
 }
 
 /**
- * The four names from the design export are real coaches, but their roles,
- * specialisms and branch assignments were written for the mock and have not
- * been confirmed — and their photos were never delivered. Publishing a real
- * person under an invented job title is not a small error, so the section
- * stays hidden until the client confirms all four rows.
+ * MOVED TO THE DATABASE. Coaches now live in the `trainers` table and are
+ * managed from Admin → Content, so the client owns their own names, titles and
+ * photographs. This type is kept only for the fixture shape; nothing reads it.
+ *
+ * The original four names came from the design export and were real people,
+ * but their roles and branches were written for the mock — which is why they
+ * were never published and are not seeded here either.
  */
 export const TRAINERS: Trainer[] = [];
 
@@ -77,7 +79,10 @@ export const SOCIAL_TILES: string[] = [];
 /** About page photo strip — same problem. */
 export const ABOUT_GALLERY: string[] = [];
 
-/** Hero and About imagery. Null renders the design's striped placeholder. */
+/**
+ * MOVED TO THE DATABASE — `site_images`, managed from Admin → Content.
+ * Null still renders the design's striped placeholder.
+ */
 export const HERO_IMAGE: string | null = null;
 export const ABOUT_HERO_IMAGE: string | null = null;
 

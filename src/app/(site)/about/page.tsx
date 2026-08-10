@@ -6,12 +6,11 @@ import { Container, Eyebrow, Heading, Section } from "@/components/ui/Primitives
 import { AboutCta, AboutTrainers } from "@/components/about/AboutClient";
 import {
   ABOUT_GALLERY,
-  ABOUT_HERO_IMAGE,
   ABOUT_STATS,
   FACILITIES,
-  TRAINERS,
 } from "@/lib/fixtures/site-content";
 import { getLocations } from "@/lib/site-settings";
+import { getSiteImages, getTrainers } from "@/lib/trainers";
 
 export const metadata: Metadata = {
   title: "About",
@@ -23,7 +22,12 @@ export const metadata: Metadata = {
 export const revalidate = 3600;
 
 export default async function AboutPage() {
-  const locations = await getLocations();
+  const [locations, trainers, images] = await Promise.all([
+    getLocations(),
+    getTrainers(),
+    getSiteImages(),
+  ]);
+  const aboutHero = images.about_hero ?? null;
 
   return (
     <>
@@ -50,7 +54,7 @@ export default async function AboutPage() {
         <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] items-center gap-12">
           <div className="aspect-[4/3] overflow-hidden rounded-[16px] border border-line">
             <CoverImage
-              src={ABOUT_HERO_IMAGE}
+              src={aboutHero?.url ?? null}
               alt="Crunch Fitness training floor"
               placeholderLabel="training floor photo"
             />
@@ -139,7 +143,7 @@ export default async function AboutPage() {
       ) : null}
 
       {/* Coaches hide until roles and branches are client-confirmed. */}
-      {TRAINERS.length > 0 ? (
+      {trainers.length > 0 ? (
       <Container className="reveal pt-[76px]">
         <div className="mb-[38px] text-center">
           <Eyebrow boxed className="mb-3.5">
@@ -153,7 +157,7 @@ export default async function AboutPage() {
             through.
           </p>
         </div>
-        <AboutTrainers />
+        <AboutTrainers trainers={trainers} />
       </Container>
       ) : null}
 

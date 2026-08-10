@@ -21,6 +21,7 @@ import type { AdminUser } from "@/lib/supabase/types";
 /** Nav items. `ready: false` parks a section with a chip; nothing is parked now. */
 const NAV = [
   { href: "/admin", label: "Site settings", ready: true, icon: SlidersIcon },
+  { href: "/admin/content", label: "Content", ready: true, icon: ImageIcon },
   { href: "/admin/enquiries", label: "Enquiries", ready: true, icon: InboxIcon },
   { href: "/admin/orders", label: "Orders", ready: true, icon: BagIcon },
   {
@@ -199,6 +200,16 @@ function SlidersIcon() {
       <circle cx="16" cy="6" r="2" />
       <circle cx="10" cy="12" r="2" />
       <circle cx="16" cy="18" r="2" />
+    </svg>
+  );
+}
+
+function ImageIcon() {
+  return (
+    <svg {...SVG}>
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="9" cy="10" r="1.6" />
+      <path d="M4 17l5-5 4 4 3-3 4 4" />
     </svg>
   );
 }
