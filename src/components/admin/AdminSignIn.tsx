@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Field";
 import { Spinner } from "@/components/ui/Modal";
 import { Heading } from "@/components/ui/Primitives";
+import { TRANSPORT_MESSAGE, isTransportFailure } from "@/lib/auth-errors";
 import { isValidEmail } from "@/lib/format";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 
@@ -74,9 +75,17 @@ export function AdminSignIn({ notice }: { notice?: string }) {
     });
 
     if (signInError) {
-      // Deliberately ignore the specific reason. Supabase distinguishes
-      // "invalid credentials" from "email not confirmed"; the visitor does not
-      // need that distinction and an attacker must not have it.
+      // A request that never reached the server says nothing about the
+      // credentials, and blaming them sends people to reset a password that
+      // was always fine. Only a real rejection gets the neutral message.
+      if (isTransportFailure(signInError)) {
+        setError(TRANSPORT_MESSAGE);
+        setPhase("signIn");
+        return;
+      }
+      // Otherwise deliberately ignore the specific reason. Supabase
+      // distinguishes "invalid credentials" from "email not confirmed"; the
+      // visitor does not need that distinction and an attacker must not.
       setError(NEUTRAL);
       setPassword("");
       setPhase("signIn");
@@ -101,11 +110,22 @@ export function AdminSignIn({ notice }: { notice?: string }) {
     setError(null);
     setPhase("working");
 
-    // The result is deliberately discarded. Reporting whether the address
-    // exists would reintroduce the enumeration leak through the back door.
-    await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
-    });
+    // Whether the address exists is deliberately discarded — reporting it
+    // would reintroduce the enumeration leak through the back door. A
+    // transport failure is different: nothing was sent, so saying "check your
+    // email" would be a lie.
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      email.trim(),
+      {
+        redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      },
+    );
+
+    if (isTransportFailure(resetError)) {
+      setError(TRANSPORT_MESSAGE);
+      setPhase("forgot");
+      return;
+    }
 
     setPhase("sent");
   }

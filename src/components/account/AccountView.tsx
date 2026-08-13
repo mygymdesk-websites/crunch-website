@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/Field";
 import { Spinner, SuccessMark } from "@/components/ui/Modal";
 import { Heading } from "@/components/ui/Primitives";
 import { MyOrders } from "@/components/account/MyOrders";
+import { TRANSPORT_MESSAGE, isTransportFailure } from "@/lib/auth-errors";
 import { isValidEmail } from "@/lib/format";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 
@@ -91,7 +92,7 @@ export function AccountView() {
     });
 
     if (otpError) {
-      setError(otpError.message);
+      setError(isTransportFailure(otpError) ? TRANSPORT_MESSAGE : otpError.message);
       setPhase("signedOut");
       return;
     }
@@ -116,7 +117,9 @@ export function AccountView() {
     });
 
     if (verifyError) {
-      setError(verifyError.message);
+      setError(
+        isTransportFailure(verifyError) ? TRANSPORT_MESSAGE : verifyError.message,
+      );
       setPhase("codeSent");
     }
   }

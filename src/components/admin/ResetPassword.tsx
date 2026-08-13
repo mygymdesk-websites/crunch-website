@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Field";
 import { Spinner } from "@/components/ui/Modal";
 import { Heading } from "@/components/ui/Primitives";
+import { TRANSPORT_MESSAGE, isTransportFailure } from "@/lib/auth-errors";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 
 /**
@@ -60,7 +61,9 @@ export function ResetPassword({ signedIn }: { signedIn: boolean }) {
     const { error: updateError } = await supabase.auth.updateUser({ password });
     if (updateError) {
       setError(
-        /same.*password/i.test(updateError.message)
+        isTransportFailure(updateError)
+          ? TRANSPORT_MESSAGE
+          : /same.*password/i.test(updateError.message)
           ? "That is already your password. Choose a different one."
           : "We couldn't set that password. Your reset link may have expired — request a new one.",
       );
